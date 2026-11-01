@@ -7,8 +7,9 @@ import streamlit as st
 from core.config import get_setting
 from ui.setup_step import render_setup
 from ui.state import STEPS, get_trip, recognizer_name, session
+from ui.upload_step import render_upload
 
-RENDERERS = {"설정": render_setup}
+RENDERERS = {"설정": render_setup, "업로드": render_upload}
 
 
 def check_password() -> bool:
