@@ -1,5 +1,6 @@
 """인식 결과를 결제 건으로 바꾸고, 정렬하고, 중복을 찾는다."""
 
+from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 
 from core.recognize_service import RecognitionOutcome
@@ -10,12 +11,15 @@ UNKNOWN_MERCHANT = "상호 미상"
 
 
 def build_expenses(
-    outcomes: list[RecognitionOutcome], trip: Trip
+    outcomes: list[RecognitionOutcome], trip: Trip, existing_ids: Iterable[str] = ()
 ) -> tuple[list[Expense], list[str]]:
-    """(결제 건, 사용자 안내 메시지)를 돌려준다. 영수증이 아니거나 원화가 아니면 제외한다."""
+    """(결제 건, 사용자 안내 메시지)를 돌려준다. 영수증이 아니거나 원화가 아니면 제외한다.
+
+    existing_ids: 이미 있는 결제 건의 id. 업로드를 나눠 해도 id가 겹치지 않게 한다.
+    """
     expenses: list[Expense] = []
     notes: list[str] = []
-    used_ids: set[str] = set()
+    used_ids: set[str] = set(existing_ids)
     for outcome in outcomes:
         receipt = outcome.receipt
         if receipt is None:

@@ -136,3 +136,13 @@ def test_find_duplicates_ignores_different_amounts_and_unknown_time():
     b = mk(amount=18500, paid_at=datetime(2026, 10, 11, 15, 1), time_known=True, id="b")
     c = mk(amount=18000, paid_at=datetime(2026, 10, 11), time_known=False, id="c")
     assert find_duplicates([b, c, a]) == []
+
+
+def test_existing_ids_are_not_reused_across_uploads():
+    first, _ = build_expenses([outcome(receipt())], prepaid_trip)
+    second, _ = build_expenses(
+        [outcome(receipt()), outcome(receipt())],
+        prepaid_trip,
+        existing_ids=[e.expense_id for e in first],
+    )
+    assert [e.expense_id for e in second] == ["a" * 12 + "-2", "a" * 12 + "-3"]
