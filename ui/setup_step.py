@@ -11,6 +11,7 @@ from ui.state import (
     SETUP_WIDGET_PREFIX,
     add_members_to_expenses,
     clear_review_widgets,
+    clear_upload_outcome,
     clear_widgets,
     get_trip,
     go_to,
@@ -33,10 +34,11 @@ PAYOUT_FIELDS = [
 
 
 def parse_members(text: str) -> list[str]:
-    """쉼표로 구분한 이름. 빈 칸은 그대로 두어 검증에서 막는다."""
-    if not text.strip():
-        return []
-    return [name.strip() for name in text.split(",")]
+    """쉼표로 구분한 이름. 끝 쉼표("A, B,")는 허용하고, 사이의 빈 칸은 그대로 두어 검증에서 막는다."""
+    names = [name.strip() for name in text.split(",")]
+    while names and not names[-1]:
+        names.pop()
+    return names
 
 
 def load_trip_file(data: bytes) -> str | None:
@@ -49,6 +51,7 @@ def load_trip_file(data: bytes) -> str | None:
     # 설정·검토 위젯을 비워야 새 여행 값으로 다시 채워진다.
     clear_widgets([SETUP_WIDGET_PREFIX], keep=SETUP_BUTTON_KEYS)
     clear_review_widgets()
+    clear_upload_outcome()
     return None
 
 

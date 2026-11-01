@@ -15,6 +15,7 @@ STEPS = ["설정", "업로드", "검토", "정산"]
 # 검토 화면 위젯 key의 접두어. 여행이 밖에서 바뀌면 이 위젯 값을 지워 여행 값으로 다시 채운다.
 REVIEW_WIDGET_PREFIXES = ("part_", "excl_", "rv_")
 SETUP_WIDGET_PREFIX = "setup_"
+UPLOAD_OUTCOME_KEYS = ("upload_notices", "upload_error", "upload_added")
 
 FIELD_LABELS = {
     "name": "여행 이름",
@@ -63,6 +64,12 @@ def clear_widgets(prefixes: Iterable[str], keep: Iterable[str] = ()) -> None:
 
 def clear_review_widgets() -> None:
     clear_widgets(REVIEW_WIDGET_PREFIXES)
+
+
+def clear_upload_outcome() -> None:
+    """지난 업로드의 안내·오류·추가 건수를 지운다. 다른 여행을 불러오면 맞지 않는 안내다."""
+    for key in UPLOAD_OUTCOME_KEYS:
+        session().pop(key, None)
 
 
 def sync_members(trip: Trip, members: list[str], leader: str) -> Trip:

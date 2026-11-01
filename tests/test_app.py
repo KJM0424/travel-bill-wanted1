@@ -385,3 +385,29 @@ def test_import_rejects_duplicate_expense_ids():
     t = trip_with([exp(1000, "A", ["A"], id="x"), exp(2000, "A", ["A"], id="x")])
     with pytest.raises(ValueError, match="불러올 수 없는"):
         import_trip(export_trip(t))
+
+
+# --- PR #4에서 넘어온 Minor ---
+
+
+def test_load_trip_file_clears_previous_upload_notices(app_session):
+    app_session["upload_notices"] = ["a.png: 영수증이 아니어서 제외했습니다."]
+    app_session["upload_error"] = "오류"
+    app_session["upload_added"] = 2
+    assert load_trip_file(export_trip(prepaid_trip_with_expenses())) is None
+    assert not app_session.get("upload_notices")
+    assert not app_session.get("upload_error") and not app_session.get("upload_added")
+
+
+def test_setup_allows_trailing_comma_in_members(monkeypatch):
+    at = open_app(monkeypatch)
+    fill_setup(at, members="민수, 지영,")
+    at.button(key="setup_save").click().run()
+    assert at.session_state["trip"].members == ["민수", "지영"]
+
+
+def test_setup_still_rejects_empty_name_between_commas(monkeypatch):
+    at = open_app(monkeypatch)
+    fill_setup(at, members="민수,, 지영")
+    at.button(key="setup_save").click().run()
+    assert at.error and "trip" not in at.session_state
