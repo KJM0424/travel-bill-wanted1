@@ -11,7 +11,12 @@ from core.recognizer.base import RecognitionError, load_prompt
 from core.schema import Receipt
 
 DEFAULT_MODEL = "gemini-2.5-flash"
-RATE_LIMIT_CODE = 429
+HTTP_TIMEOUT_MS = 60_000
+# 잠시 기다리면 풀리는 오류: 호출 한도 초과(429), 서버 과부하(503)
+RETRY_MESSAGES = {
+    429: "AI 호출 한도를 넘었습니다. 잠시 후 다시 시도하세요.",
+    503: "AI 서버가 응답하지 않습니다. 잠시 후 다시 시도하세요.",
+}
 FORMAT_RETRIES = 1
 
 
@@ -28,7 +33,9 @@ class GeminiRecognizer:
             raise RecognitionError("Gemini API 키가 설정되지 않았습니다.")
         self._api_key = api_key
         self._model = model
-        self._client = client or genai.Client(api_key=api_key)
+        self._client = client or genai.Client(
+            api_key=api_key, http_options=types.HttpOptions(timeout=HTTP_TIMEOUT_MS)
+        )
         self._sleep = sleep
         self._max_rate_retries = max_rate_retries
 
@@ -51,7 +58,7 @@ class GeminiRecognizer:
         raise AssertionError("unreachable")
 
     def _generate(self, contents: list, config: types.GenerateContentConfig) -> str | None:
-        """429는 1, 2, 4초… 간격으로 재시도한다. 그 밖의 오류는 RecognitionError로 바꾼다."""
+        """429·503은 1, 2, 4초… 간격으로 재시도한다. 그 밖의 오류는 RecognitionError로 바꾼다."""
         for attempt in range(self._max_rate_retries + 1):
             try:
                 response = self._client.models.generate_content(
@@ -59,12 +66,10 @@ class GeminiRecognizer:
                 )
                 return response.text
             except errors.APIError as e:
-                if e.code != RATE_LIMIT_CODE:
+                if e.code not in RETRY_MESSAGES:
                     raise RecognitionError(self._failure_message(e)) from None
                 if attempt == self._max_rate_retries:
-                    raise RecognitionError(
-                        "AI 호출 한도를 넘었습니다. 잠시 후 다시 시도하세요."
-                    ) from None
+                    raise RecognitionError(RETRY_MESSAGES[e.code]) from None
                 self._sleep(2**attempt)
             except Exception as e:  # noqa: BLE001
                 # 네트워크·타임아웃 등 SDK 밖의 오류도 사용자 메시지로 바꾼다.
