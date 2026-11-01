@@ -34,11 +34,15 @@ def ok_text(text: str):
 
 
 def rate_limit_error():
-    return errors.APIError(429, {"error": {"code": 429, "message": "quota", "status": "RESOURCE_EXHAUSTED"}})
+    return errors.APIError(
+        429, {"error": {"code": 429, "message": "quota", "status": "RESOURCE_EXHAUSTED"}}
+    )
 
 
 def server_error():
-    return errors.APIError(500, {"error": {"code": 500, "message": "internal", "status": "INTERNAL"}})
+    return errors.APIError(
+        500, {"error": {"code": 500, "message": "internal", "status": "INTERNAL"}}
+    )
 
 
 def test_returns_parsed_receipt():

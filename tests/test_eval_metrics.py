@@ -25,7 +25,11 @@ def row(source, core3, t, error=None):
 
 @pytest.mark.parametrize(
     "a,b",
-    [("스타벅스 애월점", "스타벅스"), ("흑돼지 명가", "흑돼지명가"), ("(주)이마트24 제주점", "이마트24")],
+    [
+        ("스타벅스 애월점", "스타벅스"),
+        ("흑돼지 명가", "흑돼지명가"),
+        ("(주)이마트24 제주점", "이마트24"),
+    ],
 )
 def test_normalize_merchant_equivalents(a, b):
     assert normalize_merchant(a) == normalize_merchant(b)
@@ -42,7 +46,9 @@ def test_core3_requires_all_three():
         "paid_at": "2026-10-11T15:02",
         "total_amount": 18000,
     }
-    s = score_case(exp, receipt(merchant="스타벅스 애월점", paid_at="2026-10-11T15:02", total=18000))
+    s = score_case(
+        exp, receipt(merchant="스타벅스 애월점", paid_at="2026-10-11T15:02", total=18000)
+    )
     assert s["core3"] is True
     assert (
         score_case(exp, receipt(merchant="스타벅스", paid_at="2026-10-11T15:03", total=18000))[

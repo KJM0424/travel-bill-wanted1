@@ -55,7 +55,7 @@ def mk(id, amount=1000, paid_at=None, time_known=False):
 
 
 def test_receipt_becomes_expense_with_defaults():
-    exps, notes = build_expenses(
+    exps, _notes = build_expenses(
         [outcome(receipt(total=96000, paid_at="2026-10-11T19:42"))], prepaid_trip
     )
     e = exps[0]
@@ -81,7 +81,9 @@ def test_not_receipt_and_foreign_currency_are_excluded_with_notice():
         ],
         prepaid_trip,
     )
-    assert exps == [] and any("cat.jpg" in n for n in notes) and any("tokyo.jpg" in n for n in notes)
+    assert (
+        exps == [] and any("cat.jpg" in n for n in notes) and any("tokyo.jpg" in n for n in notes)
+    )
 
 
 def test_failed_outcome_becomes_notice():
