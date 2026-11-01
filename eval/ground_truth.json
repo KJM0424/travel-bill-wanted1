@@ -1,0 +1,156 @@
+[
+  {
+    "file": "real/r01.jpg",
+    "source": "real",
+    "kind": "food",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "흑돼지명가",
+      "paid_at": "2026-10-11T19:42",
+      "total_amount": 96000
+    }
+  },
+  {
+    "file": "synthetic/s01.png",
+    "source": "synthetic",
+    "kind": "lodging",
+    "expected": {
+      "doc_type": "booking_capture",
+      "merchant_name": "애월 바다펜션",
+      "paid_at": "2026-10-10",
+      "total_amount": 240000
+    }
+  },
+  {
+    "file": "synthetic/s02.png",
+    "source": "synthetic",
+    "kind": "lodging",
+    "expected": {
+      "doc_type": "booking_capture",
+      "merchant_name": "서귀포 숲속호텔",
+      "paid_at": "2026-10-11",
+      "total_amount": 120000
+    }
+  },
+  {
+    "file": "synthetic/s03.png",
+    "source": "synthetic",
+    "kind": "lodging",
+    "expected": {
+      "doc_type": "booking_capture",
+      "merchant_name": "함덕 게스트하우스",
+      "paid_at": "2026-10-10",
+      "total_amount": 120000
+    }
+  },
+  {
+    "file": "synthetic/s04.png",
+    "source": "synthetic",
+    "kind": "food",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "돌하르방 고기국수",
+      "paid_at": "2026-10-10T12:31",
+      "total_amount": 40500
+    }
+  },
+  {
+    "file": "synthetic/s05.png",
+    "source": "synthetic",
+    "kind": "mart",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "하나로마트 애월점",
+      "paid_at": "2026-10-10T18:05",
+      "total_amount": 24480
+    }
+  },
+  {
+    "file": "synthetic/s06.png",
+    "source": "synthetic",
+    "kind": "food",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "성산 해녀의집",
+      "paid_at": "2026-10-11T13:15",
+      "total_amount": 40000
+    }
+  },
+  {
+    "file": "synthetic/s07.png",
+    "source": "synthetic",
+    "kind": "food",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "중문 갈치명가",
+      "paid_at": "2026-10-11T19:20",
+      "total_amount": 96000
+    }
+  },
+  {
+    "file": "synthetic/s08.png",
+    "source": "synthetic",
+    "kind": "cafe",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "바람카페",
+      "paid_at": "2026-10-10T15:42",
+      "total_amount": 16000
+    }
+  },
+  {
+    "file": "synthetic/s09.png",
+    "source": "synthetic",
+    "kind": "cafe",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "우도 땅콩카페",
+      "paid_at": "2026-10-12T11:08",
+      "total_amount": 17000
+    }
+  },
+  {
+    "file": "synthetic/s10.png",
+    "source": "synthetic",
+    "kind": "mart",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "CU 함덕해변점",
+      "paid_at": "2026-10-11T22:47",
+      "total_amount": 8700
+    }
+  },
+  {
+    "file": "synthetic/s11.png",
+    "source": "synthetic",
+    "kind": "mart",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "이마트 서귀포점",
+      "paid_at": "2026-10-12T09:30",
+      "total_amount": 35680
+    }
+  },
+  {
+    "file": "synthetic/s12.png",
+    "source": "synthetic",
+    "kind": "transport",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "SK에너지 노형주유소",
+      "paid_at": "2026-10-12T16:10",
+      "total_amount": 52000
+    }
+  },
+  {
+    "file": "synthetic/s13.png",
+    "source": "synthetic",
+    "kind": "transport",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "제주 개인택시",
+      "paid_at": "2026-10-12T17:55",
+      "total_amount": 14800
+    }
+  }
+]

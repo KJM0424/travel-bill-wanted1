@@ -1,0 +1,13 @@
+{
+  "doc_type": "booking_capture",
+  "merchant_name": "애월 바다펜션",
+  "merchant_address": null,
+  "paid_at": "2026-10-10",
+  "total_amount": 240000,
+  "currency": "KRW",
+  "category": "lodging",
+  "items": [
+    {"name": "오션뷰 4인실 2박", "amount": 240000}
+  ],
+  "warnings": ["결제 시각이 없어 날짜만 인식했습니다."]
+}

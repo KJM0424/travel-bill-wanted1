@@ -1,0 +1,52 @@
+# 테스트셋 라벨링 규칙
+
+`eval/ground_truth.json`에 사진 한 장당 항목 하나를 적는다. `python -m eval.run_eval`이 이 파일을 정답으로 쓴다.
+
+## 항목 형식
+
+```json
+{
+  "file": "real/r01.jpg",
+  "source": "real",
+  "kind": "food",
+  "expected": {
+    "doc_type": "receipt",
+    "merchant_name": "흑돼지명가",
+    "paid_at": "2026-10-11T19:42",
+    "total_amount": 96000
+  }
+}
+```
+
+- `source`: 직접 찍은 사진은 `real`, 생성기로 만든 이미지는 `synthetic`
+- `kind`: `food`, `cafe`, `mart`, `transport`, `lodging`, `tricky` 중 하나
+- 지금 들어 있는 `real/r01.jpg` 항목은 형식 예시다. 실물 사진을 라벨링하면 교체한다.
+- `synthetic` 항목은 `python -m eval.make_synthetic`이 다시 쓴다. 손으로 고치지 않는다.
+
+## 값을 적는 규칙
+
+- `total_amount`: 실제 결제 금액이다. 할인·포인트를 뺀 뒤 손님이 낸 금액을 적는다. 프롬프트의 정의와 같다.
+- `merchant_name`: 간판 기준 상호를 적는다. 채점할 때 `(주)`, 지점명(`애월점`), 공백, 문장부호는 무시한다.
+- `paid_at`: 결제 시각이다. `YYYY-MM-DDTHH:MM` 형식이고, 시간이 없으면 `YYYY-MM-DD`로 적는다. 채점은 분 단위까지 문자열이 같아야 정답이다.
+- `doc_type`: `receipt`, `booking_capture`, `card_slip`, `not_receipt` 중 하나다. 영수증이 아니면 `not_receipt`로 하고 나머지 값은 `null`로 둔다.
+
+## 촬영 규칙
+
+- 카드번호·승인번호는 가리고 찍는다.
+- 실물 사진(`eval/images/real/`)은 커밋하지 않는다. `.gitignore`에 들어 있다.
+
+## 테스트셋 구성 (실물 25장)
+
+| 종류 | 장수 |
+|---|---|
+| 식당 | 8 |
+| 카페 | 4 |
+| 마트·편의점 | 3 |
+| 교통·주유 | 2 |
+| 숙소 예약 캡처 | 3 |
+| 까다로운 경우(구겨짐, 흐림, 할인 많음 등) | 5 |
+
+## 파일 이름
+
+- 실물: `eval/images/real/r01.jpg`, `r02.jpg`, …
+- 생성: `eval/images/synthetic/s01.png`, `s02.png`, …

@@ -1,0 +1,15 @@
+{
+  "doc_type": "receipt",
+  "merchant_name": "흑돼지명가",
+  "merchant_address": "제주특별자치도 제주시 애월읍 애월해안로 100",
+  "paid_at": "2026-10-11T19:42",
+  "total_amount": 96000,
+  "currency": "KRW",
+  "category": "food",
+  "items": [
+    {"name": "흑돼지 오겹살 3인분", "amount": 84000},
+    {"name": "공기밥", "amount": 3000},
+    {"name": "한라산 소주", "amount": 9000}
+  ],
+  "warnings": []
+}
