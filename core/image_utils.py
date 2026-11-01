@@ -29,6 +29,7 @@ def normalize_image(raw: bytes) -> bytes:
         # 형식을 모르는 파일, 업로드가 끊겨 잘린 파일, 지나치게 큰 이미지
         raise UnsupportedImageError("이미지 파일이 아닙니다") from e
     img.thumbnail((MAX_LONG_SIDE, MAX_LONG_SIDE))
+    img.info.clear()  # JPEG comment 같은 메타데이터가 저장 때 다시 쓰이지 않게 한다.
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=JPEG_QUALITY)
     return buf.getvalue()

@@ -66,3 +66,11 @@ def test_normalize_rejects_truncated_image():
     Image.new("RGB", (400, 400), "white").save(buf, format="JPEG")
     with pytest.raises(UnsupportedImageError):
         normalize_image(buf.getvalue()[:300])
+
+
+def test_normalize_strips_jpeg_comment():
+    buf = io.BytesIO()
+    Image.new("RGB", (100, 50), "white").save(buf, format="JPEG", comment=b"Galaxy S24 / Jeju")
+    assert Image.open(buf).info.get("comment")
+    out = Image.open(io.BytesIO(normalize_image(buf.getvalue())))
+    assert "comment" not in out.info
