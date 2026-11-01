@@ -448,3 +448,23 @@ def test_review_many_members_do_not_use_one_column_each(monkeypatch):
     in_columns = [w for col in at.columns for w in col.children.values()]
     assert not any(str(getattr(w, "key", "")).startswith("part_") for w in in_columns)
     assert all(at.checkbox(key=f"part_m_{m}").value for m in members)
+
+
+
+def test_setup_leader_follows_member_changes(monkeypatch):
+    at = open_app(monkeypatch)
+    fill_setup(at, members="A, B")
+    at.text_input(key="setup_members").input("B, C").run()
+    leader_box = next(s for s in at.selectbox if s.label == "대표 (총무)")
+    assert (leader_box.options, leader_box.value) == (["B", "C"], "B")
+    at.button(key="setup_save").click().run()
+    assert at.session_state["trip"].leader == "B"
+
+
+def test_setup_leader_keeps_choice_when_members_grow(monkeypatch):
+    at = open_app(monkeypatch)
+    fill_setup(at, members="A, B")
+    next(s for s in at.selectbox if s.label == "대표 (총무)").set_value("B").run()
+    at.text_input(key="setup_members").input("A, B, C").run()
+    at.button(key="setup_save").click().run()
+    assert at.session_state["trip"].leader == "B"

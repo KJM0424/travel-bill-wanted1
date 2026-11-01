@@ -69,7 +69,8 @@ def render_setup() -> None:
 
     names = list(dict.fromkeys(n for n in parse_members(session()["setup_members"]) if n))
     if session().get("setup_leader") not in names:
-        session().pop("setup_leader", None)
+        # 값을 지우기만 하면 서버는 첫 사람을 고르지만 화면에는 빈 칸이나 빠진 사람이 남는다.
+        session()["setup_leader"] = names[0] if names else None
     st.selectbox("대표 (총무)", names, key="setup_leader", placeholder="참석자를 먼저 입력하세요")
 
     st.radio("정산 방식", list(MODE_BY_LABEL), key="setup_mode", horizontal=True)
