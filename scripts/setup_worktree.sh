@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 if command -v uv >/dev/null 2>&1; then
-  uv venv --python 3.12 .venv
+  [ -d .venv ] || uv venv --python 3.12 .venv
   uv pip install --python .venv/bin/python -r requirements-dev.txt
 else
   if command -v python3.12 >/dev/null 2>&1; then
@@ -14,7 +14,7 @@ else
     PYTHON=python3
     echo "python3.12가 없어 $($PYTHON --version)로 진행합니다."
   fi
-  "$PYTHON" -m venv .venv
+  [ -d .venv ] || "$PYTHON" -m venv .venv
   .venv/bin/pip install -r requirements-dev.txt
 fi
 
