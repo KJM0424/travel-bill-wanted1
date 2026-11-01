@@ -5,10 +5,13 @@ import hmac
 import streamlit as st
 
 from core.config import get_setting
+from ui.branding import PAGE_TITLE
+from ui.layout import apply_column_css, bottom_button, column, render_flashes, step_header
 from ui.result_step import render_result
 from ui.review_step import render_review
 from ui.setup_step import render_setup
-from ui.state import STEPS, get_trip, init_widget, recognizer_name, session
+from ui.start_step import render_start
+from ui.state import START_STEP, get_trip, go_to, init_widget, session
 from ui.upload_step import render_upload
 
 RENDERERS = {
@@ -30,35 +33,32 @@ def check_password() -> bool:
     if hmac.compare_digest(entered.encode(), expected.encode()):
         session()["authed"] = True
         st.rerun()
-    st.error("비밀번호가 맞지 않습니다.")
+    st.error("비밀번호가 맞지 않아요.")
     return False
 
 
-def main() -> None:
-    st.set_page_config(page_title="여행 영수증 정산", page_icon=":material/receipt_long:")
-    st.title("여행 영수증 정산", icon=":material/receipt_long:")
-    if not check_password():
-        return
-
-    # 좁은 화면에서는 사이드바가 접히므로 단계 이동을 본문 맨 위에 둔다.
-    init_widget("step", STEPS[0])
-    st.segmented_control(
-        "단계",
-        STEPS,
-        key="step",
-        required=True,
-        format_func=lambda s: f"{STEPS.index(s) + 1}. {s}",
-        label_visibility="collapsed",
-        width="stretch",
-    )
-    mode = recognizer_name()
-    st.caption(f"인식기: {mode}" + (" (API 호출 없음)" if mode == "mock" else ""))
-
-    step = session()["step"]
+def render_step(step: str) -> None:
+    step_header(step)
     if step != "설정" and get_trip() is None:
-        st.info("먼저 여행 설정을 저장하세요.")
+        st.info("여행 설정을 먼저 저장해 주세요.")
+        bottom_button("여행 설정하러 가기", key="need_setup", on_click=go_to, args=("설정",))
         return
+    render_flashes()
     RENDERERS[step]()
+
+
+def main() -> None:
+    st.set_page_config(page_title=PAGE_TITLE, page_icon=":material/receipt_long:")
+    apply_column_css()
+    with column():
+        if not check_password():
+            return
+        init_widget("step", START_STEP)
+        step = session()["step"]
+        if step == START_STEP:
+            render_start()
+        else:
+            render_step(step)
 
 
 main()

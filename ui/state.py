@@ -10,7 +10,10 @@ from core.config import get_setting
 from core.recognizer import MockRecognizer, RecognitionError, Recognizer
 from core.schema import FUND_WALLET, Trip
 
+START_STEP = "시작"
 STEPS = ["설정", "업로드", "검토", "정산"]
+# 진행 표시에 쓰는 이름. 단계 값(STEPS)은 세션·테스트에서 쓰므로 그대로 둔다.
+STEP_LABELS = {"설정": "설정", "업로드": "영수증", "검토": "확인", "정산": "정산"}
 
 # 검토 화면 위젯 key의 접두어. 여행이 밖에서 바뀌면 이 위젯 값을 지워 여행 값으로 다시 채운다.
 REVIEW_WIDGET_PREFIXES = ("part_", "excl_", "rv_")

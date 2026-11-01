@@ -49,7 +49,9 @@ def trip_with(
 def open_app(monkeypatch) -> AppTest:
     monkeypatch.setenv("RECOGNIZER", "mock")
     monkeypatch.setenv("APP_PASSWORD", "")
-    return AppTest.from_file(APP_PATH, default_timeout=30).run()
+    at = AppTest.from_file(APP_PATH, default_timeout=30).run()
+    # 시작 화면에서 '정산 시작하기'를 눌러 설정 화면으로 간다.
+    return at.button(key="start_begin").click().run()
 
 
 def open_app_with_trip(

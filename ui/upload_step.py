@@ -8,11 +8,12 @@ from core.expense_builder import build_expenses, sort_expenses
 from core.recognize_service import MAX_FILES, recognize_batch
 from core.recognizer import RecognitionError
 from ui import state
+from ui.layout import bottom_button
 
 PROMPT_VERSION = "v1"
 DATA_NOTICE = (
-    "이미지는 Google Gemini API로 전송됩니다. 카드번호·이름은 가리고 올려 주세요. "
-    "올린 이미지는 서버에 저장하지 않습니다."
+    "사진은 Google Gemini API로 보내 내용을 읽어요. 카드번호와 이름은 가리고 올려 주세요. "
+    "사진은 서버에 저장하지 않아요."
 )
 
 
@@ -26,13 +27,13 @@ def process_uploads(
     store["upload_added"] = 0
     if len(files) > MAX_FILES:
         store["upload_notices"] = [
-            f"한 번에 최대 {MAX_FILES}장까지 올릴 수 있습니다. {len(files)}장을 골랐습니다."
+            f"한 번에 {MAX_FILES}장까지 올릴 수 있어요. 지금 {len(files)}장을 골랐어요."
         ]
         return
     try:
         recognizer = state.get_recognizer()
     except RecognitionError as e:
-        store["upload_error"] = f"{e} 영수증 내용은 수동으로 추가할 수 있습니다."
+        store["upload_error"] = f"{e} 영수증 내용은 직접 입력할 수 있어요."
         return
 
     trip = state.get_trip()
@@ -48,39 +49,47 @@ def process_uploads(
 
 
 def render_upload() -> None:
-    st.header("영수증 올리기")
-    st.info(DATA_NOTICE, icon=":material/shield:")
-    with st.form("upload_form", clear_on_submit=True):
+    st.header("영수증을 올려 주세요", anchor=False)
+    st.caption(DATA_NOTICE)
+    has_expenses = bool(state.get_trip().expenses)
+    with st.form("upload_form", clear_on_submit=True, border=False):
         files = st.file_uploader(
-            f"영수증·예약 캡처 이미지 (한 번에 최대 {MAX_FILES}장)",
+            f"영수증·예약 캡처 사진 (한 번에 {MAX_FILES}장까지)",
             type=["jpg", "jpeg", "png", "heic"],
             accept_multiple_files=True,
         )
+        # 아직 결제 건이 없으면 '읽기'가 이 화면의 주요 버튼이다.
         submitted = st.form_submit_button(
-            "인식 시작", type="primary", icon=":material/document_scanner:"
+            "영수증 읽기",
+            type="secondary" if has_expenses else "primary",
+            width="stretch",
+            icon=":material/document_scanner:",
         )
 
     if submitted:
         if not files:
-            st.warning("이미지를 1장 이상 고른 뒤 인식 시작을 누르세요.")
+            st.warning("사진을 1장 이상 골라 주세요.")
         else:
-            bar = st.progress(0.0, text="인식 중…")
+            bar = st.progress(0.0, text="영수증을 읽고 있어요")
 
             def on_progress(done: int, total: int) -> None:
                 # recognize_batch가 호출 스레드(메인 스레드)에서 부른다.
-                bar.progress(done / total, text=f"인식 중… {done}/{total}")
+                bar.progress(done / total, text=f"영수증을 읽고 있어요 {done}/{total}")
 
             process_uploads([(f.name, f.getvalue()) for f in files], on_progress)
             bar.empty()
+            st.rerun()
 
     _render_outcome()
     st.button(
-        "영수증 없는 지출 수동으로 추가하기",
+        "영수증 없이 직접 입력할게요",
         key="upload_manual",
-        icon=":material/edit_note:",
+        type="tertiary",
         on_click=state.go_to,
         args=("검토",),
     )
+    if state.get_trip().expenses:
+        bottom_button("다음", key="upload_next", on_click=state.go_to, args=("검토",))
 
 
 def _render_outcome() -> None:
@@ -94,12 +103,4 @@ def _render_outcome() -> None:
         # 파일마다 상자를 띄우면 화면이 안내로 덮이므로 한 상자에 모은다.
         st.warning("\n".join(f"- {n}" for n in notices))
     if store.get("upload_added"):
-        st.success(f"결제 건 {store['upload_added']}개를 추가했습니다. 검토 단계에서 확인하세요.")
-        st.button(
-            "다음 단계: 검토",
-            key="upload_next",
-            type="primary",
-            icon=":material/fact_check:",
-            on_click=state.go_to,
-            args=("검토",),
-        )
+        st.success(f"결제 {store['upload_added']}건을 추가했어요. 다음 화면에서 확인해 주세요.")
