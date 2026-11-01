@@ -1,0 +1,16 @@
+# 비밀 정보
+.env
+.streamlit/secrets.toml
+
+# 환경
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# 실물 영수증 사진과 원본 평가 결과는 커밋하지 않는다 (요약 CSV만 커밋)
+eval/images/real/
+eval/results/*.json
+
+# 실행 계획 작업 공간
+.superpowers/
