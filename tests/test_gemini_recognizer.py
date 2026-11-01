@@ -91,3 +91,9 @@ def test_other_api_error_is_wrapped_without_key():
 def test_missing_api_key():
     with pytest.raises(RecognitionError, match="API 키"):
         GeminiRecognizer("")
+
+
+def test_unknown_prompt_version_is_recognition_error():
+    client = fake_client([ok_text(food_json)])
+    with pytest.raises(RecognitionError, match="v999"):
+        GeminiRecognizer("k", client=client, sleep=lambda s: None).recognize(b"img", "v999")

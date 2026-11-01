@@ -33,10 +33,11 @@ class GeminiRecognizer:
         self._max_rate_retries = max_rate_retries
 
     def recognize(self, image: bytes, prompt_version: str) -> Receipt:
-        contents = [
-            types.Part.from_bytes(data=image, mime_type="image/jpeg"),
-            load_prompt(prompt_version),
-        ]
+        try:
+            prompt = load_prompt(prompt_version)
+        except ValueError as e:
+            raise RecognitionError(str(e)) from None
+        contents = [types.Part.from_bytes(data=image, mime_type="image/jpeg"), prompt]
         config = types.GenerateContentConfig(
             response_mime_type="application/json", response_schema=Receipt, temperature=0
         )

@@ -67,4 +67,7 @@ def _recognize_one(
             receipt = recognizer.recognize(image, prompt_version)
     except (UnsupportedImageError, RecognitionError) as e:
         error = str(e)
+    except Exception as e:  # noqa: BLE001
+        # 예상하지 못한 오류도 이 파일만 실패로 처리하고 나머지는 계속한다.
+        error = f"처리 중 오류: {type(e).__name__}: {e}"
     return RecognitionOutcome(filename, digest, receipt, error, time.perf_counter() - started)

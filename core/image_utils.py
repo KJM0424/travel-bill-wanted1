@@ -25,7 +25,8 @@ def normalize_image(raw: bytes) -> bytes:
     try:
         img = Image.open(io.BytesIO(raw))
         img = ImageOps.exif_transpose(img).convert("RGB")
-    except UnidentifiedImageError as e:
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as e:
+        # 형식을 모르는 파일, 업로드가 끊겨 잘린 파일, 지나치게 큰 이미지
         raise UnsupportedImageError("이미지 파일이 아닙니다") from e
     img.thumbnail((MAX_LONG_SIDE, MAX_LONG_SIDE))
     buf = io.BytesIO()

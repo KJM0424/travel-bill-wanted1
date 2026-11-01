@@ -72,3 +72,20 @@ def test_progress_callback_reaches_total():
         on_progress=lambda d, t: seen.append((d, t)),
     )
     assert seen[-1] == (2, 2)
+
+
+class FailsOnRed:
+    """빨간 이미지에서만 예상하지 못한 예외를 던진다."""
+
+    def recognize(self, image, prompt_version):
+        r, g, _ = Image.open(io.BytesIO(image)).getpixel((0, 0))
+        if r > 200 and g < 50:
+            raise RuntimeError("boom")
+        return MockRecognizer().recognize(image, prompt_version)
+
+
+def test_unexpected_error_in_one_file_does_not_stop_others():
+    files = [("ok.png", png()), ("red.png", png(color="red"))]
+    out = recognize_batch(files, FailsOnRed(), "v1", {})
+    assert out[0].receipt is not None
+    assert out[1].receipt is None and "boom" in out[1].error

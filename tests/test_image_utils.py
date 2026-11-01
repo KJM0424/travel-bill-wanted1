@@ -59,3 +59,10 @@ def test_normalize_rejects_non_image():
 def test_image_hash_is_stable():
     data = make_png(10, 10)
     assert image_hash(data) == image_hash(data) and len(image_hash(data)) == 64
+
+
+def test_normalize_rejects_truncated_image():
+    buf = io.BytesIO()
+    Image.new("RGB", (400, 400), "white").save(buf, format="JPEG")
+    with pytest.raises(UnsupportedImageError):
+        normalize_image(buf.getvalue()[:300])
