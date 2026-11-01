@@ -1,0 +1,24 @@
+[
+  {
+    "file": "real/r01.jpg",
+    "source": "real",
+    "kind": "food",
+    "expected": {
+      "doc_type": "receipt",
+      "merchant_name": "흑돼지명가",
+      "paid_at": "2026-10-11T19:42",
+      "total_amount": 96000
+    }
+  },
+  {
+    "file": "synthetic/s01.png",
+    "source": "synthetic",
+    "kind": "lodging",
+    "expected": {
+      "doc_type": "booking_capture",
+      "merchant_name": "애월 바다펜션",
+      "paid_at": "2026-10-10",
+      "total_amount": 240000
+    }
+  }
+]
