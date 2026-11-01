@@ -17,7 +17,9 @@ class LineItem(BaseModel):
 
 
 class Receipt(BaseModel):
-    """AI 인식 결과. Gemini response_schema로도 쓰므로 기본값을 두지 않는다.
+    """AI 인식 결과. Gemini response_schema로도 쓴다.
+
+    기본값을 두지 않아 Gemini가 모든 필드를 채우게 한다.
 
     카드번호·승인번호·전화번호 필드는 의도적으로 두지 않는다.
     """

@@ -79,6 +79,6 @@ def test_receipt_schema_has_no_card_number_field():
 
 
 def test_receipt_schema_has_no_defaults_for_gemini():
-    # Gemini response_schema는 기본값(default)을 지원하지 않는다.
+    # 기본값이 없어야 Gemini가 모든 필드를 빠짐없이 채워서 응답한다.
     props = Receipt.model_json_schema()["properties"]
     assert not any("default" in p for p in props.values())
