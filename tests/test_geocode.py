@@ -123,3 +123,22 @@ def test_returns_none_without_request_when_api_key_missing():
     s = fake_session({"address.json": {"documents": [{"x": "1", "y": "2"}]}})
     assert geocode(mk(address="x"), "", s) is None
     assert s.calls == []
+
+
+def test_closes_session_it_created(monkeypatch):
+    created: list[FakeSession] = []
+
+    class ClosableSession(FakeSession):
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    def make_session() -> ClosableSession:
+        s = ClosableSession({"address.json": {"documents": [{"x": "1", "y": "2"}]}})
+        created.append(s)
+        return s
+
+    monkeypatch.setattr(requests, "Session", make_session)
+    assert geocode(mk(address="x"), "k") == (2.0, 1.0)
+    assert len(created) == 1 and created[0].closed
