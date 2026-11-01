@@ -93,7 +93,9 @@ def _render_card(number: int, e: Expense, trip: Trip, label: str) -> Expense:
 
     with st.container(border=True):
         source = "AI 인식" if e.source == "ai" else "수동 입력"
-        st.markdown(f"**#{number} {label}** · {format_won(e.amount)} · {source}")
+        # 같은 상호가 여러 건이면 label에 이미 순번이 들어 있다.
+        title = label if label != e.merchant_name else f"#{number} {label}"
+        st.markdown(f"**{title}** · {format_won(e.amount)} · {source}")
         for warning in e.warnings:
             st.warning(warning)
 

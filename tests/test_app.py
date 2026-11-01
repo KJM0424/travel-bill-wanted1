@@ -9,7 +9,9 @@ from core.expense_builder import sort_expenses
 from core.schema import FUND_WALLET
 from tests.ui_helpers import APP_PATH, exp, fill_setup, open_app, open_app_with_trip, trip_with
 from ui import state
+from ui.result_step import export_trip, import_trip
 from ui.review_step import add_manual_expense, expense_labels
+from ui.setup_step import load_trip_file
 from ui.upload_step import process_uploads
 
 
@@ -265,3 +267,98 @@ def test_review_render_alone_does_not_change_trip(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=expenses)
     at.run()
     assert at.session_state["trip"].expenses == expenses
+
+
+# --- 정산 결과 단계 (Task 14) ---
+
+
+def prepaid_trip_with_expenses():
+    return trip_with(
+        [
+            exp(30000, "A", ["A", "B", "C"], id="e1", paid_at=DUP_TIME, time_known=True),
+            exp(9000, "B", ["A", "B"], id="e2", merchant="카페"),
+        ]
+    )
+
+
+def test_export_import_roundtrip():
+    t = prepaid_trip_with_expenses()
+    assert import_trip(export_trip(t)) == t
+
+
+@pytest.mark.parametrize("data", [b"", b"{}", b"not json", b'{"name": 1}', b"\xff\xfe"])
+def test_import_rejects_bad_file(data):
+    with pytest.raises(ValueError, match="불러올 수 없는"):
+        import_trip(data)
+
+
+def test_result_blocked_when_not_ready(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(0, "A", ["A"])], step="정산")
+    assert any("금액이 0원" in e.value for e in at.error) and not at.dataframe
+    assert any(b.key == "result_back" for b in at.button)
+
+
+def test_result_blocked_when_participants_empty(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(1000, "A", [])], step="정산")
+    assert any("참석자가 없습니다" in e.value for e in at.error) and not at.exception
+
+
+def test_result_errors_distinguish_same_merchant(monkeypatch):
+    expenses = [dup_a, dup_b.model_copy(update={"amount": 0})]
+    at = open_app_with_trip(monkeypatch, expenses=expenses, step="정산")
+    assert any("#2" in e.value and "금액이 0원" in e.value for e in at.error)
+
+
+def test_result_shows_table_and_messages(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
+    assert at.dataframe and sum("10,000원" in c.value for c in at.code) == 2
+
+
+def test_result_fund_leader_shortfall_shown_separately(monkeypatch):
+    at = open_app_with_trip(
+        monkeypatch,
+        expenses=[exp(36000, FUND_WALLET, ["A", "B", "C"])],
+        step="정산",
+        mode="fund",
+        fee=10000,
+    )
+    assert len(at.code) == 2 and not any("A님 →" in c.value for c in at.code)
+    assert any("대표가 직접 채울 금액" in i.value and "2,000원" in i.value for i in at.info)
+
+
+def test_result_fund_leader_refund_shown_separately(monkeypatch):
+    at = open_app_with_trip(
+        monkeypatch,
+        expenses=[exp(24000, FUND_WALLET, ["A", "B", "C"])],
+        step="정산",
+        mode="fund",
+        fee=10000,
+    )
+    assert len(at.code) == 2 and not any("A님께" in c.value for c in at.code)
+    assert any("대표" in i.value and "2,000원" in i.value for i in at.info)
+
+
+def test_result_has_download_button(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
+    assert at.get("download_button")
+
+
+def test_load_trip_file_replaces_trip_and_resets_widgets(app_session):
+    app_session["setup_members"] = "옛날 값"
+    app_session["part_e1_A"] = False
+    loaded = prepaid_trip_with_expenses()
+    assert load_trip_file(export_trip(loaded)) is None
+    assert app_session["trip"] == loaded
+    assert "setup_members" not in app_session and "part_e1_A" not in app_session
+
+
+def test_load_trip_file_bad_file_keeps_trip(app_session):
+    before = app_session["trip"]
+    assert "불러올 수 없는" in load_trip_file(b"not json")
+    assert app_session["trip"] is before
+
+
+def test_review_card_title_shows_number_once(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[dup_a, dup_b])
+    titles = [m.value for m in at.markdown if "카페" in m.value]
+    assert titles and not any(t.count("#2") > 1 or t.count("#1") > 1 for t in titles)

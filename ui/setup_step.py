@@ -6,9 +6,11 @@ import streamlit as st
 from pydantic import ValidationError
 
 from core.schema import Trip
+from ui.result_step import import_trip
 from ui.state import (
     SETUP_WIDGET_PREFIX,
     clear_review_widgets,
+    clear_widgets,
     get_trip,
     go_to,
     init_widget,
@@ -20,6 +22,8 @@ from ui.state import (
 
 MODE_LABELS = {"prepaid": "선결제형", "fund": "회비형"}
 MODE_BY_LABEL = {label: mode for mode, label in MODE_LABELS.items()}
+# 저장 버튼은 위젯 상태를 지우면 안 된다.
+SETUP_BUTTON_KEYS = ("setup_save", "setup_next")
 PAYOUT_FIELDS = [
     ("bank_account", "계좌 (은행 계좌번호 예금주)"),
     ("toss_link", "토스 송금 링크"),
@@ -34,8 +38,22 @@ def parse_members(text: str) -> list[str]:
     return [name.strip() for name in text.split(",")]
 
 
+def load_trip_file(data: bytes) -> str | None:
+    """내려받았던 결과 JSON으로 여행을 바꾼다. 실패하면 오류 문장을 돌려준다."""
+    try:
+        trip = import_trip(data)
+    except ValueError as e:
+        return str(e)
+    set_trip(trip)
+    # 설정·검토 위젯을 비워야 새 여행 값으로 다시 채워진다.
+    clear_widgets([SETUP_WIDGET_PREFIX], keep=SETUP_BUTTON_KEYS)
+    clear_review_widgets()
+    return None
+
+
 def render_setup() -> None:
     st.header("1. 여행 설정")
+    _render_import()
     trip = get_trip()
     _init_from_trip(trip)
 
@@ -64,6 +82,19 @@ def render_setup() -> None:
 
     if st.button("저장", key="setup_save", type="primary"):
         _save(trip, names)
+
+
+def _render_import() -> None:
+    uploaded = st.file_uploader("저장한 정산 파일(JSON) 불러오기", type=["json"], key="import_file")
+    # 업로더는 파일을 계속 들고 있으므로 같은 파일을 매번 다시 불러오지 않게 한다.
+    if uploaded is None or session().get("imported_file_id") == uploaded.file_id:
+        return
+    session()["imported_file_id"] = uploaded.file_id
+    error = load_trip_file(uploaded.getvalue())
+    if error:
+        st.error(error)
+    else:
+        st.success("정산 파일을 불러왔습니다.")
 
 
 def _init_from_trip(trip: Trip | None) -> None:

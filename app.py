@@ -5,12 +5,18 @@ import hmac
 import streamlit as st
 
 from core.config import get_setting
+from ui.result_step import render_result
 from ui.review_step import render_review
 from ui.setup_step import render_setup
 from ui.state import STEPS, get_trip, recognizer_name, session
 from ui.upload_step import render_upload
 
-RENDERERS = {"설정": render_setup, "업로드": render_upload, "검토": render_review}
+RENDERERS = {
+    "설정": render_setup,
+    "업로드": render_upload,
+    "검토": render_review,
+    "정산": render_result,
+}
 
 
 def check_password() -> bool:
@@ -43,11 +49,7 @@ def main() -> None:
     if step != "설정" and get_trip() is None:
         st.info("먼저 여행 설정을 저장하세요.")
         return
-    render = RENDERERS.get(step)
-    if render is None:
-        st.info("아직 준비 중인 단계입니다.")
-        return
-    render()
+    RENDERERS[step]()
 
 
 main()
