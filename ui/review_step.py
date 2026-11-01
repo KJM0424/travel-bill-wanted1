@@ -4,6 +4,7 @@ from collections import Counter
 from datetime import datetime, time
 
 import streamlit as st
+from streamlit.delta_generator import DeltaGenerator
 
 from core.expense_builder import UNKNOWN_MERCHANT, find_duplicates, sort_expenses
 from core.payment_message import format_won
@@ -56,10 +57,13 @@ def expense_labels(trip: Trip) -> dict[str, str]:
 
 
 def render_review() -> None:
-    st.header("3. 검토·참석자 체크")
+    st.header("검토·참석자 체크")
     trip = get_trip()
     if not trip.expenses:
-        st.info("결제 건이 없습니다. 영수증을 올리거나 아래에서 수동으로 추가하세요.")
+        st.info(
+            "아직 결제 건이 없습니다. 영수증을 올리거나 아래에서 수동으로 추가하세요.",
+            icon=":material/receipt_long:",
+        )
 
     labels = expense_labels(trip)
     _render_duplicates(trip, labels)
@@ -72,7 +76,14 @@ def render_review() -> None:
         set_trip(trip.model_copy(update={"expenses": sort_expenses(updated)}))
 
     _render_manual_form()
-    st.button("다음: 정산 →", key="review_next", type="primary", on_click=go_to, args=("정산",))
+    st.button(
+        "다음 단계: 정산",
+        key="review_next",
+        type="primary",
+        icon=":material/calculate:",
+        on_click=go_to,
+        args=("정산",),
+    )
 
 
 def _render_duplicates(trip: Trip, labels: dict[str, str]) -> None:
@@ -93,17 +104,17 @@ def _render_card(number: int, e: Expense, trip: Trip, label: str) -> Expense:
         payer_options.append(e.payer)
 
     with st.container(border=True):
-        source = "AI 인식" if e.source == "ai" else "수동 입력"
-        # 같은 상호가 여러 건이면 label에 이미 순번이 들어 있다.
-        title = label if label != e.merchant_name else f"#{number} {label}"
-        st.markdown(f"**{title}** · {format_won(e.amount)} · {source}")
+        # 머리줄은 위젯 값을 읽은 뒤에 채운다. 먼저 그리면 금액을 고친 직후 옛 금액이 보인다.
+        head = st.container(
+            horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"
+        )
         for warning in e.warnings:
             st.warning(warning)
 
         name_col, amount_col = st.columns([3, 2])
         name = name_col.text_input("상호", key=f"rv_name_{eid}")
         amount = amount_col.number_input("금액 (원)", min_value=0, step=100, key=f"rv_amount_{eid}")
-        date_col, time_col, unknown_col = st.columns([2, 2, 1])
+        date_col, time_col, unknown_col = st.columns([2, 2, 1], vertical_alignment="bottom")
         day = date_col.date_input("날짜", key=f"rv_date_{eid}")
         no_time = unknown_col.checkbox("시간 모름", key=f"rv_notime_{eid}")
         clock = time_col.time_input("시각", key=f"rv_time_{eid}", disabled=no_time)
@@ -115,6 +126,7 @@ def _render_card(number: int, e: Expense, trip: Trip, label: str) -> Expense:
         with st.container(horizontal=True, gap="medium"):
             participants = [m for m in trip.members if st.checkbox(m, key=f"part_{eid}_{m}")]
         excluded = st.checkbox("정산에서 제외", key=f"excl_{eid}")
+        _render_card_head(head, number, e, label, int(amount), excluded)
 
     # '시간 모름'을 풀어도 시각을 고르기 전까지는 시간을 모르는 것으로 둔다(00:00으로 정하지 않는다).
     time_known = not no_time and clock is not None
@@ -135,6 +147,19 @@ def _render_card(number: int, e: Expense, trip: Trip, label: str) -> Expense:
     return e.model_copy(update={**changes, "participants": list(participants)})
 
 
+def _render_card_head(
+    head: DeltaGenerator, number: int, e: Expense, label: str, amount: int, excluded: bool
+) -> None:
+    """영수증처럼 이름은 왼쪽, 금액은 오른쪽에 둔다."""
+    # 같은 상호가 여러 건이면 label에 이미 순번이 들어 있다.
+    title = label if label != e.merchant_name else f"#{number} {label}"
+    source = ":blue-badge[AI 인식]" if e.source == "ai" else ":gray-badge[수동 입력]"
+    badges = source + (" :red-badge[정산 제외]" if excluded else "")
+    head.markdown(f"**{title}** {badges}", width="content")
+    won = format_won(amount)
+    head.markdown(f"~~{won}~~" if excluded else f"**{won}**", width="content")
+
+
 def _init_card_widgets(e: Expense, trip: Trip) -> None:
     eid = e.expense_id
     init_widget(f"rv_name_{eid}", e.merchant_name)
@@ -150,7 +175,7 @@ def _init_card_widgets(e: Expense, trip: Trip) -> None:
 
 
 def _render_manual_form() -> None:
-    st.subheader("영수증 없는 지출 추가")
+    st.subheader("영수증 없는 지출 추가", icon=":material/edit_note:")
     with st.form("manual_form", clear_on_submit=True):
         name_col, amount_col = st.columns([3, 2])
         merchant = name_col.text_input("상호·내용", key="manual_merchant", placeholder="주차비")
@@ -158,7 +183,7 @@ def _render_manual_form() -> None:
         date_col, time_col = st.columns(2)
         day = date_col.date_input("날짜 (선택)", value=None, key="manual_date")
         clock = time_col.time_input("시각 (선택)", value=None, key="manual_time")
-        submitted = st.form_submit_button("추가", key="manual_add")
+        submitted = st.form_submit_button("추가", key="manual_add", icon=":material/add:")
 
     if not submitted:
         return

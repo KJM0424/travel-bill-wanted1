@@ -8,7 +8,7 @@ from core.config import get_setting
 from ui.result_step import render_result
 from ui.review_step import render_review
 from ui.setup_step import render_setup
-from ui.state import STEPS, get_trip, recognizer_name, session
+from ui.state import STEPS, get_trip, init_widget, recognizer_name, session
 from ui.upload_step import render_upload
 
 RENDERERS = {
@@ -35,15 +35,24 @@ def check_password() -> bool:
 
 
 def main() -> None:
-    st.set_page_config(page_title="여행 영수증 정산", page_icon="🧾")
-    st.title("🧾 여행 영수증 정산")
+    st.set_page_config(page_title="여행 영수증 정산", page_icon=":material/receipt_long:")
+    st.title("여행 영수증 정산", icon=":material/receipt_long:")
     if not check_password():
         return
 
-    with st.sidebar:
-        st.radio("단계", STEPS, key="step")
-        mode = recognizer_name()
-        st.caption(f"인식기: {mode}" + (" (API 호출 없음)" if mode == "mock" else ""))
+    # 좁은 화면에서는 사이드바가 접히므로 단계 이동을 본문 맨 위에 둔다.
+    init_widget("step", STEPS[0])
+    st.segmented_control(
+        "단계",
+        STEPS,
+        key="step",
+        required=True,
+        format_func=lambda s: f"{STEPS.index(s) + 1}. {s}",
+        label_visibility="collapsed",
+        width="stretch",
+    )
+    mode = recognizer_name()
+    st.caption(f"인식기: {mode}" + (" (API 호출 없음)" if mode == "mock" else ""))
 
     step = session()["step"]
     if step != "설정" and get_trip() is None:

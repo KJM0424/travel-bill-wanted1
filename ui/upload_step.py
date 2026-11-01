@@ -48,19 +48,21 @@ def process_uploads(
 
 
 def render_upload() -> None:
-    st.header("2. 영수증 올리기")
-    st.info(DATA_NOTICE)
+    st.header("영수증 올리기")
+    st.info(DATA_NOTICE, icon=":material/shield:")
     with st.form("upload_form", clear_on_submit=True):
         files = st.file_uploader(
             f"영수증·예약 캡처 이미지 (한 번에 최대 {MAX_FILES}장)",
             type=["jpg", "jpeg", "png", "heic"],
             accept_multiple_files=True,
         )
-        submitted = st.form_submit_button("인식 시작", type="primary")
+        submitted = st.form_submit_button(
+            "인식 시작", type="primary", icon=":material/document_scanner:"
+        )
 
     if submitted:
         if not files:
-            st.warning("이미지를 1장 이상 고르세요.")
+            st.warning("이미지를 1장 이상 고른 뒤 인식 시작을 누르세요.")
         else:
             bar = st.progress(0.0, text="인식 중…")
 
@@ -73,8 +75,9 @@ def render_upload() -> None:
 
     _render_outcome()
     st.button(
-        "영수증 없는 지출은 수동으로 추가하기 →",
+        "영수증 없는 지출 수동으로 추가하기",
         key="upload_manual",
+        icon=":material/edit_note:",
         on_click=state.go_to,
         args=("검토",),
     )
@@ -84,8 +87,19 @@ def _render_outcome() -> None:
     store = state.session()
     if store.get("upload_error"):
         st.error(store["upload_error"])
-    for notice in store.get("upload_notices", []):
-        st.warning(notice)
+    notices = store.get("upload_notices", [])
+    if len(notices) == 1:
+        st.warning(notices[0])
+    elif notices:
+        # 파일마다 상자를 띄우면 화면이 안내로 덮이므로 한 상자에 모은다.
+        st.warning("\n".join(f"- {n}" for n in notices))
     if store.get("upload_added"):
         st.success(f"결제 건 {store['upload_added']}개를 추가했습니다. 검토 단계에서 확인하세요.")
-        st.button("다음: 검토 →", key="upload_next", on_click=state.go_to, args=("검토",))
+        st.button(
+            "다음 단계: 검토",
+            key="upload_next",
+            type="primary",
+            icon=":material/fact_check:",
+            on_click=state.go_to,
+            args=("검토",),
+        )

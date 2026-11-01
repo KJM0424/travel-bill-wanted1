@@ -11,6 +11,8 @@ from ui.review_step import expense_labels
 from ui.state import get_trip, go_to
 
 IMPORT_ERROR = "불러올 수 없는 파일입니다."
+# .streamlit/config.toml의 greenColor·redColor와 같은 값이다.
+NET_COLORS = {"receive": "#276B4A", "send": "#B8372A"}
 
 
 def export_trip(trip: Trip) -> bytes:
@@ -37,14 +39,21 @@ def labeled_trip(trip: Trip) -> Trip:
 
 
 def render_result() -> None:
-    st.header("4. 정산 결과")
+    st.header("정산 결과")
     trip = get_trip()
     # 참석자가 비었거나 여행 밖 이름이면 compute_balances가 예외를 내므로 먼저 막는다.
     errors = readiness_errors(labeled_trip(trip))
     if errors:
         for error in errors:
             st.error(error)
-        st.button("검토로 돌아가기", key="result_back", on_click=go_to, args=("검토",))
+        st.button(
+            "검토로 돌아가 고치기",
+            key="result_back",
+            type="primary",
+            icon=":material/arrow_back:",
+            on_click=go_to,
+            args=("검토",),
+        )
         return
 
     balances = compute_balances(trip)
@@ -56,6 +65,7 @@ def render_result() -> None:
         file_name=f"{trip.name}-정산.json",
         mime="application/json",
         key="result_download",
+        icon=":material/download:",
     )
     st.caption("내려받은 파일은 설정 단계에서 다시 불러올 수 있습니다.")
 
@@ -64,17 +74,32 @@ def _signed_won(amount: int) -> str:
     return f"+{format_won(amount)}" if amount > 0 else format_won(amount)
 
 
+def _net_color(net: int) -> str:
+    """받을 돈은 초록, 보낼 돈은 빨강. 부호(+/-)도 함께 보여 색에만 기대지 않는다."""
+    if net > 0:
+        return f"color: {NET_COLORS['receive']}"
+    if net < 0:
+        return f"color: {NET_COLORS['send']}"
+    return ""
+
+
 def _render_table(balances: list[Balance], trip: Trip) -> None:
-    rows = [
-        {
-            "이름": b.name,
-            "낸 돈": format_won(b.paid),
-            "부담액": format_won(b.owed),
-            "차액": _signed_won(b.net),
-        }
-        for b in balances
-    ]
-    st.dataframe(pd.DataFrame(rows), hide_index=True)
+    rows = [{"이름": b.name, "낸 돈": b.paid, "부담액": b.owed, "차액": b.net} for b in balances]
+    # 숫자 칸으로 두어 영수증처럼 오른쪽 정렬된다.
+    styled = (
+        pd.DataFrame(rows)
+        .style.map(_net_color, subset=["차액"])
+        .format(_signed_won, subset=["차액"])
+    )
+    st.dataframe(
+        styled,
+        hide_index=True,
+        column_config={
+            "낸 돈": st.column_config.NumberColumn(format="%,d원"),
+            "부담액": st.column_config.NumberColumn(format="%,d원"),
+        },
+        alt=f"{trip.name} 사람별 낸 돈, 부담액, 차액",
+    )
     caption = "차액이 +이면 받을 돈, -이면 보낼 돈입니다."
     if trip.mode == "fund":
         caption += (
@@ -92,10 +117,11 @@ def _is_leader_wallet(transfer: Transfer, trip: Trip) -> bool:
 
 
 def _render_transfers(transfers: list[Transfer], trip: Trip) -> None:
-    st.subheader("송금 메시지")
+    st.subheader("송금 메시지", icon=":material/send_money:")
     if not transfers:
         st.success("주고받을 돈이 없습니다.")
         return
+    st.caption("메시지 오른쪽 위 복사 버튼을 눌러 단톡방에 붙여 넣으세요.")
     for transfer in transfers:
         amount = format_won(transfer.amount)
         if _is_leader_wallet(transfer, trip) and transfer.sender == trip.leader:

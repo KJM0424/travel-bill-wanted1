@@ -24,6 +24,10 @@ from ui.state import (
 
 MODE_LABELS = {"prepaid": "선결제형", "fund": "회비형"}
 MODE_BY_LABEL = {label: mode for mode, label in MODE_LABELS.items()}
+MODE_HELP = {
+    "prepaid": "각자 결제한 뒤 끝나고 나눕니다.",
+    "fund": "회비를 먼저 모아 회비 지갑에서 결제하고, 남거나 모자란 돈을 나눕니다.",
+}
 # 저장 버튼은 위젯 상태를 지우면 안 된다.
 SETUP_BUTTON_KEYS = ("setup_save", "setup_next")
 PAYOUT_FIELDS = [
@@ -56,7 +60,7 @@ def load_trip_file(data: bytes) -> str | None:
 
 
 def render_setup() -> None:
-    st.header("1. 여행 설정")
+    st.header("여행 설정")
     _render_import()
     trip = get_trip()
     _init_from_trip(trip)
@@ -73,11 +77,16 @@ def render_setup() -> None:
         session()["setup_leader"] = names[0] if names else None
     st.selectbox("대표 (총무)", names, key="setup_leader", placeholder="참석자를 먼저 입력하세요")
 
-    st.radio("정산 방식", list(MODE_BY_LABEL), key="setup_mode", horizontal=True)
+    st.segmented_control("정산 방식", list(MODE_BY_LABEL), key="setup_mode", required=True)
+    st.caption(MODE_HELP[MODE_BY_LABEL[session()["setup_mode"]]])
     if session()["setup_mode"] == MODE_LABELS["fund"]:
         st.number_input("1인 회비 (원)", min_value=0, step=10000, key="setup_fee")
 
-    with st.expander("송금 정보 (돈을 받을 수 있는 사람만 입력)"):
+    with st.expander(
+        "송금 정보 (돈을 받을 수 있는 사람만 입력)", icon=":material/account_balance:"
+    ):
+        if not names:
+            st.caption("참석자를 먼저 입력하세요.")
         for name in names:
             st.markdown(f"**{name}**")
             for field, label in PAYOUT_FIELDS:
@@ -85,12 +94,17 @@ def render_setup() -> None:
                 init_widget(key, "")
                 st.text_input(label, key=key)
 
-    if st.button("저장", key="setup_save", type="primary"):
+    if st.button("저장", key="setup_save", type="primary", icon=":material/save:"):
         _save(trip, names)
 
 
 def _render_import() -> None:
-    uploaded = st.file_uploader("저장한 정산 파일(JSON) 불러오기", type=["json"], key="import_file")
+    uploaded = st.file_uploader(
+        "저장한 정산 파일(JSON) 불러오기",
+        type=["json"],
+        key="import_file",
+        help="정산 단계에서 내려받은 파일을 올리면 이어서 고칠 수 있습니다.",
+    )
     # 업로더는 파일을 계속 들고 있으므로 같은 파일을 매번 다시 불러오지 않게 한다.
     if uploaded is None or session().get("imported_file_id") == uploaded.file_id:
         return
@@ -176,4 +190,10 @@ def _save(previous: Trip | None, names: list[str]) -> None:
         )
     if count and removed:
         st.info(f"{', '.join(removed)}님을 모든 결제 건의 참석자·결제자에서 뺐습니다.")
-    st.button("다음: 영수증 올리기 →", key="setup_next", on_click=go_to, args=("업로드",))
+    st.button(
+        "다음 단계: 영수증 올리기",
+        key="setup_next",
+        icon=":material/upload:",
+        on_click=go_to,
+        args=("업로드",),
+    )

@@ -66,7 +66,7 @@ def open_app_with_trip(
 def fill_setup(at: AppTest, members: str, mode: str = "선결제형", fee: int = 0) -> AppTest:
     at.text_input(key="setup_name").input("제주").run()
     at.text_input(key="setup_members").input(members).run()
-    at.radio(key="setup_mode").set_value(mode).run()
+    at.segmented_control(key="setup_mode").set_value(mode).run()
     if mode == "회비형":
         at.number_input(key="setup_fee").set_value(fee).run()
     return at

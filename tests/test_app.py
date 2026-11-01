@@ -76,13 +76,13 @@ def test_setup_resave_syncs_expenses(monkeypatch):
 
 def test_later_steps_need_trip(monkeypatch):
     at = open_app(monkeypatch)
-    at.radio(key="step").set_value("정산").run()
+    at.segmented_control(key="step").set_value("정산").run()
     assert any("여행 설정" in i.value for i in at.info)
 
 
-def test_sidebar_shows_recognizer(monkeypatch):
+def test_shows_recognizer(monkeypatch):
     at = open_app(monkeypatch)
-    assert any("mock" in c.value for c in at.sidebar.caption)
+    assert any("mock" in c.value for c in at.caption)
 
 
 def _has_button(at: AppTest, key: str) -> bool:
@@ -448,7 +448,6 @@ def test_review_many_members_do_not_use_one_column_each(monkeypatch):
     in_columns = [w for col in at.columns for w in col.children.values()]
     assert not any(str(getattr(w, "key", "")).startswith("part_") for w in in_columns)
     assert all(at.checkbox(key=f"part_m_{m}").value for m in members)
-
 
 
 def test_setup_leader_follows_member_changes(monkeypatch):
