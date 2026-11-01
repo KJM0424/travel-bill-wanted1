@@ -155,7 +155,7 @@ requirements.txt, .env.example, .streamlit/secrets.toml.example
   - 두 곳 모두 초기 커밋 `935f943` 상태다.
 - **방식 (확정): 기능마다 새 작업 공간을 만들고, PR로 main에 머지한다.**
   - main은 배포 기준이다. Streamlit Cloud가 main을 배포한다.
-  - main에는 직접 커밋하지 않는다. 브랜치 이름은 `feature/기능명`, 커밋은 `타입: 한국어 설명` 형식을 따른다(git-workflow 스킬).
+  - 기능 작업은 `feature/기능명` 브랜치(작업 공간)에서 하고 main에 머지한다.
   - 아직 원격 저장소가 없다. Streamlit Cloud 배포와 PR에 필요하므로 1일차에 GitHub 저장소를 만들어 연결한다.
   - 기존 `원티드-1차-프로젝트` 작업 공간은 쓰지 않는다. 지울지는 나중에 사용자에게 묻는다.
 
@@ -165,7 +165,7 @@ requirements.txt, .env.example, .streamlit/secrets.toml.example
 | 0 | `feature/design-spec`, `feature/scaffold` (main 작업 공간에서 진행) | 이 스펙, 프로젝트 뼈대: 폴더 구조, `requirements.txt`, `CLAUDE.md`, `core/schema.py`(공통 계약), `.env.example`, 작업 공간 셋업 스크립트 | 없음. 이게 먼저 머지돼야 나머지를 시작한다 |
 | 1 | `feature/settlement` | `core/settlement.py`, `core/payment_message.py`, pytest | 0 |
 | 1 | `feature/recognizer` | `core/recognizer/`(Gemini, Mock), `core/image_utils.py`, `prompts/v1.md`, `eval/` | 0 |
-| 2 | `feature/ui` | `app.py` 4단계 흐름, 목 모드로 시작해서 실제 백엔드 연결, 배포 | 1(settlement 머지 후) |
+| 2 | `feature/ui` | `app.py` 4단계 흐름, 목 모드로 시작해서 실제 백엔드 연결, 배포 | 1(settlement·recognizer 모두 머지 후) |
 | 3 | `feature/prompt-v2` | v1 실패 분석 → v2, 측정 | recognizer, 테스트셋 라벨링 |
 | 3 | `feature/map` (선택) | `core/geocode.py`, 경로 지도 | ui |
 | 4 | `feature/hardening` | 안정성 방어, 상호 테스트에서 나온 수정 | ui |
