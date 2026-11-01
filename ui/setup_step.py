@@ -9,6 +9,7 @@ from core.schema import Trip
 from ui.result_step import import_trip
 from ui.state import (
     SETUP_WIDGET_PREFIX,
+    add_members_to_expenses,
     clear_review_widgets,
     clear_widgets,
     get_trip,
@@ -155,7 +156,20 @@ def _save(previous: Trip | None, names: list[str]) -> None:
         for message in validation_messages(e):
             st.error(message)
         return
+    before = previous.members if previous else trip.members
+    added = [m for m in trip.members if m not in before]
+    removed = [m for m in before if m not in trip.members]
+    if added:
+        trip = add_members_to_expenses(trip, added)
     set_trip(trip)
     clear_review_widgets()
     st.success("여행 설정을 저장했습니다.")
+    count = len(trip.expenses)
+    if count and added:
+        st.info(
+            f"{', '.join(added)}님을 기존 결제 건 {count}개의 참석자로 추가했습니다. "
+            "빠진 결제 건은 검토 단계에서 해제하세요."
+        )
+    if count and removed:
+        st.info(f"{', '.join(removed)}님을 모든 결제 건의 참석자·결제자에서 뺐습니다.")
     st.button("다음: 영수증 올리기 →", key="setup_next", on_click=go_to, args=("업로드",))

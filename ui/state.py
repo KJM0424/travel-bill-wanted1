@@ -86,6 +86,16 @@ def sync_members(trip: Trip, members: list[str], leader: str) -> Trip:
     )
 
 
+def add_members_to_expenses(trip: Trip, names: list[str]) -> Trip:
+    """새로 들어온 사람을 모든 결제 건 참석자로 체크한다(기본 전원 체크). 순서는 members 순서다."""
+    new = set(names)
+    data = trip.model_dump()
+    for expense in data["expenses"]:
+        joined = set(expense["participants"]) | new
+        expense["participants"] = [m for m in trip.members if m in joined]
+    return Trip.model_validate(data)
+
+
 def validation_messages(error: ValidationError) -> list[str]:
     """pydantic 오류를 화면에 보여 줄 한국어 문장으로 바꾼다. 영어 원문은 보여 주지 않는다."""
     messages = []

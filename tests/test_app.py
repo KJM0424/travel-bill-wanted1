@@ -362,3 +362,26 @@ def test_review_card_title_shows_number_once(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[dup_a, dup_b])
     titles = [m.value for m in at.markdown if "카페" in m.value]
     assert titles and not any(t.count("#2") > 1 or t.count("#1") > 1 for t in titles)
+
+
+def test_setup_readding_member_checks_them_on_existing_expenses(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(9000, "A", ["A", "B", "C"])], step="설정")
+    at.text_input(key="setup_members").input("A, B").run()
+    at.button(key="setup_save").click().run()
+    at.text_input(key="setup_members").input("A, B, C").run()
+    at.button(key="setup_save").click().run()
+    assert at.session_state["trip"].expenses[0].participants == ["A", "B", "C"]
+    assert any("C" in i.value and "추가" in i.value for i in at.info)
+
+
+def test_setup_removing_member_is_reported(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(9000, "A", ["A", "B", "C"])], step="설정")
+    at.text_input(key="setup_members").input("A, B").run()
+    at.button(key="setup_save").click().run()
+    assert any("C" in i.value and "뺐" in i.value for i in at.info)
+
+
+def test_import_rejects_duplicate_expense_ids():
+    t = trip_with([exp(1000, "A", ["A"], id="x"), exp(2000, "A", ["A"], id="x")])
+    with pytest.raises(ValueError, match="불러올 수 없는"):
+        import_trip(export_trip(t))

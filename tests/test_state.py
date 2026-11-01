@@ -4,7 +4,12 @@ from pydantic import ValidationError
 from core.recognizer import MockRecognizer, RecognitionError
 from core.schema import FUND_WALLET, Trip
 from tests.ui_helpers import exp, trip_with
-from ui.state import get_recognizer, sync_members, validation_messages
+from ui.state import (
+    add_members_to_expenses,
+    get_recognizer,
+    sync_members,
+    validation_messages,
+)
 
 
 # Review Focus 2
@@ -61,3 +66,11 @@ def test_get_recognizer_gemini_without_key_raises(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     with pytest.raises(RecognitionError, match="API 키"):
         get_recognizer()
+
+
+def test_add_members_to_expenses_checks_new_member_everywhere():
+    t = trip_with([exp(9000, "A", ["A", "B"])], members=["A", "B"])
+    t = sync_members(t, ["A", "B", "C"], leader="A")
+    t2 = add_members_to_expenses(t, ["C"])
+    assert t2.expenses[0].participants == ["A", "B", "C"]
+    assert t.expenses[0].participants == ["A", "B"]

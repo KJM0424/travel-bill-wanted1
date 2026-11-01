@@ -19,9 +19,14 @@ def export_trip(trip: Trip) -> bytes:
 
 def import_trip(data: bytes) -> Trip:
     try:
-        return Trip.model_validate_json(data)
+        trip = Trip.model_validate_json(data)
     except (ValidationError, ValueError):
         raise ValueError(IMPORT_ERROR) from None
+    # 결제 건 id는 위젯 key가 되므로 겹치면 화면이 멈춘다.
+    ids = [e.expense_id for e in trip.expenses]
+    if len(ids) != len(set(ids)):
+        raise ValueError(IMPORT_ERROR)
+    return trip
 
 
 def labeled_trip(trip: Trip) -> Trip:
