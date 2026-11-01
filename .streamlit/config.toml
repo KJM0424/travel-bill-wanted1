@@ -1,27 +1,46 @@
-# 디자인 방향은 docs/design-notes.md 참고. 감열지 영수증 위에 볼펜으로 고치는 느낌.
-[theme]
-base = "light"
-backgroundColor = "#F4F5F2"
-secondaryBackgroundColor = "#E6E8E3"
-codeBackgroundColor = "#FFFFFF"
-textColor = "#262A33"
-primaryColor = "#2C46A0"
-linkColor = "#2C46A0"
-borderColor = "#C9CCC4"
-redColor = "#B8372A"
-greenColor = "#276B4A"
-greenBackgroundColor = "#DCEAE0"
-greenTextColor = "#1F5A3D"
-blueColor = "#2C46A0"
-font = "'IBM Plex Sans KR':https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap"
-codeFont = "'Nanum Gothic Coding':https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding:wght@400;700&display=swap"
-codeFontSize = "0.95rem"
-headingFontSizes = ["2rem", "1.5rem", "1.2rem"]
-headingFontWeights = [700, 700, 500]
-baseRadius = "0.35rem"
-showWidgetBorder = true
-dataframeHeaderBackgroundColor = "#E6E8E3"
-dataframeBorderColor = "#C9CCC4"
+# 디자인 방향은 docs/design-notes.md 참고. 흰 바탕, 진한 본문, 강조색은 '여권 초록' 하나.
+[server]
+# Pretendard 글꼴 파일(static/fonts)을 앱에서 직접 내려준다.
+enableStaticServing = true
 
 [client]
+# Deploy 버튼·개발자 메뉴를 숨긴다.
 toolbarMode = "minimal"
+
+[[theme.fontFaces]]
+family = "Pretendard"
+url = "app/static/fonts/PretendardVariable.woff2"
+weight = "45 920"
+
+[theme]
+base = "light"
+font = "Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
+codeFont = "Pretendard, -apple-system, BlinkMacSystemFont, sans-serif"
+baseFontSize = 15
+baseFontWeight = 500
+codeFontSize = "15px"
+codeFontWeight = 500
+headingFontSizes = ["40px", "22px", "17px"]
+headingFontWeights = [800, 700, 600]
+
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F4F6"
+codeBackgroundColor = "#F3F4F6"
+textColor = "#1B1F26"
+primaryColor = "#17654C"
+linkColor = "#17654C"
+borderColor = "#E4E6E9"
+dataframeBorderColor = "#E4E6E9"
+dataframeHeaderBackgroundColor = "#F3F4F6"
+redColor = "#C2362B"
+greenColor = "#17654C"
+greenBackgroundColor = "#E6F2EC"
+greenTextColor = "#17654C"
+blueBackgroundColor = "#F3F4F6"
+blueTextColor = "#1B1F26"
+
+paddingTop = "0.5rem"
+paddingBottom = "2rem"
+baseRadius = "12px"
+buttonRadius = "12px"
+showWidgetBorder = false
