@@ -1,0 +1,14 @@
+{
+  "doc_type": "receipt",
+  "merchant_name": "스타벅스 애월점",
+  "merchant_address": "제주특별자치도 제주시 애월읍 애월로 200",
+  "paid_at": "2026-10-11T15:02",
+  "total_amount": 18000,
+  "currency": "KRW",
+  "category": "cafe",
+  "items": [
+    {"name": "아메리카노", "amount": 9000},
+    {"name": "카페라테", "amount": 9000}
+  ],
+  "warnings": []
+}

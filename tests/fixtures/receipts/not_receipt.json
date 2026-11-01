@@ -1,0 +1,11 @@
+{
+  "doc_type": "not_receipt",
+  "merchant_name": null,
+  "merchant_address": null,
+  "paid_at": null,
+  "total_amount": null,
+  "currency": "KRW",
+  "category": "etc",
+  "items": [],
+  "warnings": ["영수증이 아닌 사진입니다."]
+}
