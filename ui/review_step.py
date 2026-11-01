@@ -68,7 +68,8 @@ def render_review() -> None:
         for number, e in enumerate(trip.expenses, start=1)
     ]
     if updated != trip.expenses:
-        set_trip(trip.model_copy(update={"expenses": updated}))
+        # 날짜·시각을 고치면 순서가 바뀔 수 있다. 위젯 key는 결제 건 id라서 다시 정렬해도 값이 유지된다.
+        set_trip(trip.model_copy(update={"expenses": sort_expenses(updated)}))
 
     _render_manual_form()
     st.button("다음: 정산 →", key="review_next", type="primary", on_click=go_to, args=("정산",))
@@ -110,20 +111,19 @@ def _render_card(number: int, e: Expense, trip: Trip, label: str) -> Expense:
         payer = st.selectbox("결제자", payer_options, key=f"rv_payer_{eid}")
 
         st.caption("참석자 (빠진 사람만 해제)")
-        columns = st.columns(len(trip.members))
-        participants = [
-            m
-            for m, col in zip(trip.members, columns, strict=True)
-            if col.checkbox(m, key=f"part_{eid}_{m}")
-        ]
+        # 사람 수만큼 칸을 나누면 많을 때 이름이 잘린다. 가로로 놓고 넘치면 다음 줄로 보낸다.
+        with st.container(horizontal=True, gap="medium"):
+            participants = [m for m in trip.members if st.checkbox(m, key=f"part_{eid}_{m}")]
         excluded = st.checkbox("정산에서 제외", key=f"excl_{eid}")
 
-    paid_at = datetime.combine(day, time(0) if no_time else clock) if day else None
+    # '시간 모름'을 풀어도 시각을 고르기 전까지는 시간을 모르는 것으로 둔다(00:00으로 정하지 않는다).
+    time_known = not no_time and clock is not None
+    paid_at = datetime.combine(day, clock if time_known else time(0)) if day else None
     changes = {
         "merchant_name": name.strip() or UNKNOWN_MERCHANT,
         "merchant_address": address.strip() or None,
         "paid_at": paid_at,
-        "time_known": paid_at is not None and not no_time,
+        "time_known": paid_at is not None and time_known,
         "amount": int(amount),
         "payer": payer,
         "participants": participants,
@@ -141,7 +141,7 @@ def _init_card_widgets(e: Expense, trip: Trip) -> None:
     init_widget(f"rv_amount_{eid}", e.amount)
     init_widget(f"rv_date_{eid}", e.paid_at.date() if e.paid_at else None)
     init_widget(f"rv_notime_{eid}", not e.time_known)
-    init_widget(f"rv_time_{eid}", e.paid_at.time() if e.paid_at else time(0))
+    init_widget(f"rv_time_{eid}", e.paid_at.time() if e.paid_at and e.time_known else None)
     init_widget(f"rv_addr_{eid}", e.merchant_address or "")
     init_widget(f"rv_payer_{eid}", e.payer)
     for m in trip.members:

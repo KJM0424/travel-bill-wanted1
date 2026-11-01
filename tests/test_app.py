@@ -390,6 +390,22 @@ def test_import_rejects_duplicate_expense_ids():
 # --- PR #4에서 넘어온 Minor ---
 
 
+def test_review_date_change_resorts_expenses(monkeypatch):
+    first = exp(1000, "A", ["A"], id="x1", merchant="아침", paid_at=DUP_TIME, time_known=True)
+    second = exp(
+        2000,
+        "A",
+        ["A"],
+        id="x2",
+        merchant="저녁",
+        paid_at=DUP_TIME + timedelta(hours=5),
+        time_known=True,
+    )
+    at = open_app_with_trip(monkeypatch, expenses=[first, second])
+    at.date_input(key="rv_date_x2").set_value((DUP_TIME - timedelta(days=1)).date()).run()
+    assert [e.expense_id for e in at.session_state["trip"].expenses] == ["x2", "x1"]
+
+
 def test_load_trip_file_clears_previous_upload_notices(app_session):
     app_session["upload_notices"] = ["a.png: 영수증이 아니어서 제외했습니다."]
     app_session["upload_error"] = "오류"
@@ -397,6 +413,16 @@ def test_load_trip_file_clears_previous_upload_notices(app_session):
     assert load_trip_file(export_trip(prepaid_trip_with_expenses())) is None
     assert not app_session.get("upload_notices")
     assert not app_session.get("upload_error") and not app_session.get("upload_added")
+
+
+def test_review_unchecking_time_unknown_does_not_set_midnight(monkeypatch):
+    no_time = exp(1000, "A", ["A"], id="t", paid_at=datetime(2026, 10, 11), time_known=False)
+    at = open_app_with_trip(monkeypatch, expenses=[no_time])
+    at.checkbox(key="rv_notime_t").uncheck().run()
+    assert at.session_state["trip"].expenses[0].time_known is False
+    at.time_input(key="rv_time_t").set_value(datetime(2026, 10, 11, 9, 30).time()).run()
+    e = at.session_state["trip"].expenses[0]
+    assert e.time_known and e.paid_at == datetime(2026, 10, 11, 9, 30)
 
 
 def test_setup_allows_trailing_comma_in_members(monkeypatch):
@@ -411,3 +437,14 @@ def test_setup_still_rejects_empty_name_between_commas(monkeypatch):
     fill_setup(at, members="민수,, 지영")
     at.button(key="setup_save").click().run()
     assert at.error and "trip" not in at.session_state
+
+
+def test_review_many_members_do_not_use_one_column_each(monkeypatch):
+    members = ["A", *(f"친구{i}" for i in range(9))]
+    at = open_app_with_trip(
+        monkeypatch, expenses=[exp(10000, "A", members, id="m")], members=members
+    )
+    # 사람 수만큼 칸을 나누면 칸이 좁아져 이름이 글자 단위로 줄바꿈된다.
+    in_columns = [w for col in at.columns for w in col.children.values()]
+    assert not any(str(getattr(w, "key", "")).startswith("part_") for w in in_columns)
+    assert all(at.checkbox(key=f"part_m_{m}").value for m in members)
