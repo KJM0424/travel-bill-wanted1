@@ -156,3 +156,13 @@ def test_readiness_ignores_excluded():
         readiness_errors(trip("prepaid", [exp(5000, "A", ["A"]), exp(0, "A", [], excluded=True)]))
         == []
     )
+
+
+def test_readiness_rejects_participant_outside_trip():
+    errs = readiness_errors(trip("prepaid", [exp(9000, "A", ["B", "D"])]))
+    assert errs == ["'가게9000' 참석자 중 여행 참석자가 아닌 사람이 있습니다: D"]
+
+
+def test_readiness_rejects_fund_wallet_as_participant():
+    errs = readiness_errors(trip("fund", [exp(9000, "A", [FUND_WALLET])], fee=1000))
+    assert errs == [f"'가게9000' 참석자 중 여행 참석자가 아닌 사람이 있습니다: {FUND_WALLET}"]
