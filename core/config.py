@@ -30,6 +30,4 @@ def _read_dotenv(name: str) -> str | None:
 
 def get_setting(name: str, default: str | None = None) -> str | None:
     """st.secrets → 환경변수 → .env 파일 → default 순서로 찾는다. 빈 값은 없는 것으로 본다."""
-    return (
-        _read_streamlit_secret(name) or os.environ.get(name) or _read_dotenv(name) or default
-    )
+    return _read_streamlit_secret(name) or os.environ.get(name) or _read_dotenv(name) or default
