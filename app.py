@@ -5,11 +5,12 @@ import hmac
 import streamlit as st
 
 from core.config import get_setting
+from ui.review_step import render_review
 from ui.setup_step import render_setup
 from ui.state import STEPS, get_trip, recognizer_name, session
 from ui.upload_step import render_upload
 
-RENDERERS = {"설정": render_setup, "업로드": render_upload}
+RENDERERS = {"설정": render_setup, "업로드": render_upload, "검토": render_review}
 
 
 def check_password() -> bool:

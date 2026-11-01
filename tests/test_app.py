@@ -1,12 +1,15 @@
 import io
+from datetime import datetime, timedelta
 
 import pytest
 from PIL import Image
 from streamlit.testing.v1 import AppTest
 
 from core.expense_builder import sort_expenses
+from core.schema import FUND_WALLET
 from tests.ui_helpers import APP_PATH, exp, fill_setup, open_app, open_app_with_trip, trip_with
 from ui import state
+from ui.review_step import add_manual_expense, expense_labels
 from ui.upload_step import process_uploads
 
 
@@ -150,3 +153,115 @@ def test_upload_step_renders_notice_and_button(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[], step="업로드")
     assert any("Gemini" in c.value for c in at.caption) or any("Gemini" in i.value for i in at.info)
     assert _has_button(at, "upload_manual")
+
+
+# --- 검토 단계 (Task 13) ---
+
+prepaid_trip = trip_with([])
+DUP_TIME = datetime(2026, 10, 11, 15, 2)
+dup_a = exp(
+    18000, "A", ["A", "B", "C"], id="d1", merchant="카페", paid_at=DUP_TIME, time_known=True
+)
+dup_b = exp(
+    18000,
+    "A",
+    ["A", "B", "C"],
+    id="d2",
+    merchant="카페",
+    paid_at=DUP_TIME + timedelta(minutes=5),
+    time_known=True,
+)
+
+
+def test_add_manual_expense_defaults():
+    t = add_manual_expense(prepaid_trip, "주차비", 4000, None)
+    e = t.expenses[-1]
+    assert (e.source, e.payer, e.participants, e.amount) == ("manual", "A", ["A", "B", "C"], 4000)
+
+
+def test_add_manual_expense_fund_payer_is_wallet():
+    t = add_manual_expense(trip_with([], mode="fund", fee=10000), "주차비", 4000, None)
+    assert t.expenses[-1].payer == FUND_WALLET
+
+
+def test_add_manual_expense_ids_unique():
+    t = add_manual_expense(prepaid_trip, "주차비", 4000, None)
+    t = add_manual_expense(t, "주차비", 4000, None)
+    assert len({e.expense_id for e in t.expenses}) == 2
+
+
+def test_add_manual_expense_does_not_change_original():
+    add_manual_expense(prepaid_trip, "주차비", 4000, None)
+    assert prepaid_trip.expenses == []
+
+
+def test_expense_labels_distinguish_same_merchant():
+    labels = expense_labels(trip_with([dup_a, dup_b]))
+    assert labels["d1"] != labels["d2"] and "카페" in labels["d1"]
+
+
+def test_expense_labels_plain_when_unique():
+    assert expense_labels(trip_with([exp(1000, "A", ["A"], merchant="편의점")]))["e1"] == "편의점"
+
+
+def test_review_unchecking_member_updates_participants(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(18000, "A", ["A", "B", "C"], id="cafe")])
+    at.checkbox(key="part_cafe_C").uncheck().run()
+    assert at.session_state["trip"].expenses[0].participants == ["A", "B"]
+
+
+def test_review_change_payer_and_amount(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(18000, "A", ["A", "B", "C"], id="cafe")])
+    at.selectbox(key="rv_payer_cafe").set_value("B").run()
+    at.number_input(key="rv_amount_cafe").set_value(20000).run()
+    e = at.session_state["trip"].expenses[0]
+    assert (e.payer, e.amount) == ("B", 20000)
+
+
+def test_review_fund_payer_options_include_wallet(monkeypatch):
+    at = open_app_with_trip(
+        monkeypatch,
+        expenses=[exp(18000, FUND_WALLET, ["A", "B", "C"], id="cafe")],
+        mode="fund",
+        fee=10000,
+    )
+    assert FUND_WALLET in at.selectbox(key="rv_payer_cafe").options
+
+
+def test_review_exclude(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[dup_a, dup_b])
+    at.checkbox(key="excl_d2").check().run()
+    assert at.session_state["trip"].expenses[1].excluded
+
+
+def test_review_shows_duplicate_warning(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[dup_a, dup_b])
+    assert any("중복" in w.value for w in at.warning)
+
+
+def test_review_shows_expense_warnings(monkeypatch):
+    e = exp(18000, "A", ["A"], id="w").model_copy(update={"warnings": ["합계와 품목 합이 다름"]})
+    at = open_app_with_trip(monkeypatch, expenses=[e])
+    assert any("합계와 품목 합이 다름" in w.value for w in at.warning)
+
+
+def test_review_manual_add_form(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[])
+    at.text_input(key="manual_merchant").input("주차비")
+    at.number_input(key="manual_amount").set_value(4000)
+    at.button(key="manual_add").click().run()
+    e = at.session_state["trip"].expenses[-1]
+    assert (e.merchant_name, e.amount, e.source) == ("주차비", 4000, "manual")
+
+
+def test_review_manual_add_requires_merchant_and_amount(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[])
+    at.button(key="manual_add").click().run()
+    assert at.error and at.session_state["trip"].expenses == []
+
+
+def test_review_render_alone_does_not_change_trip(monkeypatch):
+    expenses = [dup_a, exp(5000, "A", ["A", "B"], id="no-date")]
+    at = open_app_with_trip(monkeypatch, expenses=expenses)
+    at.run()
+    assert at.session_state["trip"].expenses == expenses
