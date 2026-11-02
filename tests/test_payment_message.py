@@ -50,7 +50,7 @@ def test_message_first_line_names_trip_sender_receiver_and_amount():
 
 def test_message_without_payout_info():  # Review Focus 4
     msg = build_message(Transfer("B", "C", 5000), trip_with_payout("A", PayoutInfo()))
-    assert "5,000원" in msg and "받는 분께 계좌를 확인하세요" in msg
+    assert "5,000원" in msg and "받는 분께 계좌를 확인해 주세요" in msg
 
 
 def test_message_only_lists_present_channels():
@@ -71,4 +71,4 @@ def test_fund_wallet_sender_is_refund_message():
         Transfer(FUND_WALLET, "B", 7000), trip_with_payout("A", PayoutInfo(), mode="fund")
     )
     assert "환급" in msg and "A" in msg
-    assert msg.splitlines()[0] == "[제주] 대표 A님이 B님께 회비 7,000원을 환급합니다."
+    assert msg.splitlines()[0] == "[제주] 대표 A님이 B님께 회비 7,000원을 환급해요."

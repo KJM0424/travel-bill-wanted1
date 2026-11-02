@@ -137,6 +137,22 @@ def test_process_uploads_reports_not_receipt(app_session):
     assert any("cat.png" in n for n in app_session["upload_notices"])
 
 
+def test_process_uploads_skips_non_image_files_with_notice(app_session):
+    process_uploads([("receipt.pdf", b"%PDF-1.4"), ("a.png", png())])
+    assert (
+        "receipt.pdf: 이미지 파일만 올릴 수 있어요 (JPG·PNG·HEIC)" in app_session["upload_notices"]
+    )
+    assert len(app_session["trip"].expenses) == 1
+    assert len(app_session["recognition_cache"]) == 1
+
+
+def test_process_uploads_only_non_images_adds_nothing(app_session):
+    process_uploads([("memo.txt", b"hello"), ("receipt.PDF", b"%PDF-1.4")])
+    notices = app_session["upload_notices"]
+    assert len(notices) == 2 and all("이미지 파일만 올릴 수 있어요" in n for n in notices)
+    assert app_session["trip"].expenses == [] and app_session["upload_added"] == 0
+
+
 def test_process_uploads_uses_cache(app_session):
     process_uploads([("a.png", png())])
     assert len(app_session["recognition_cache"]) == 1
@@ -298,7 +314,7 @@ def test_result_blocked_when_not_ready(monkeypatch):
 
 def test_result_blocked_when_participants_empty(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(1000, "A", [])], step="정산")
-    assert any("참석자가 없습니다" in e.value for e in at.error) and not at.exception
+    assert any("참석자가 없어요" in e.value for e in at.error) and not at.exception
 
 
 def test_result_errors_distinguish_same_merchant(monkeypatch):
@@ -406,7 +422,7 @@ def test_review_date_change_resorts_expenses(monkeypatch):
 
 
 def test_load_trip_file_clears_previous_upload_notices(app_session):
-    app_session["upload_notices"] = ["a.png: 영수증이 아니어서 제외했습니다."]
+    app_session["upload_notices"] = ["a.png: 영수증이 아니어서 제외했어요."]
     app_session["upload_error"] = "오류"
     app_session["upload_added"] = 2
     assert load_trip_file(export_trip(prepaid_trip_with_expenses())) is None

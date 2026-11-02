@@ -115,7 +115,7 @@ def test_retries_on_unavailable_then_succeeds():
 
 def test_gives_up_after_unavailable_retries():
     client = fake_client([unavailable_error()] * 4)
-    with pytest.raises(RecognitionError, match="응답하지 않습니다"):
+    with pytest.raises(RecognitionError, match="응답하지 않아요"):
         GeminiRecognizer("k", client=client, sleep=lambda s: None).recognize(b"img", "v1")
     assert len(client.calls) == 4
 

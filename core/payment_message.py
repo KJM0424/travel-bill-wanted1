@@ -3,7 +3,7 @@
 from core.schema import FUND_WALLET, PayoutInfo, Trip
 from core.settlement import Transfer
 
-NO_PAYOUT_NOTICE = "받는 분께 계좌를 확인하세요."
+NO_PAYOUT_NOTICE = "받는 분께 계좌를 확인해 주세요."
 
 
 def format_won(amount: int) -> str:
@@ -27,7 +27,7 @@ def build_message(transfer: Transfer, trip: Trip) -> str:
     amount = format_won(transfer.amount)
     receiver = transfer.receiver
     if transfer.sender == FUND_WALLET:
-        first = f"[{trip.name}] 대표 {trip.leader}님이 {receiver}님께 회비 {amount}을 환급합니다."
+        first = f"[{trip.name}] 대표 {trip.leader}님이 {receiver}님께 회비 {amount}을 환급해요."
     elif receiver == FUND_WALLET:
         first = f"[{trip.name}] {transfer.sender}님 → {FUND_WALLET}(대표 {trip.leader}) {amount}"
     else:

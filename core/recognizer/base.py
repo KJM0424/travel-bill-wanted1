@@ -21,5 +21,5 @@ def load_prompt(version: str) -> str:
     """prompts/{version}.md를 읽는다. version은 v1, v2 같은 형식만 받는다."""
     path = PROMPTS_DIR / f"{version}.md"
     if not re.fullmatch(r"v\d+", version) or not path.exists():
-        raise ValueError(f"프롬프트 버전 '{version}'을 찾을 수 없습니다.")
+        raise ValueError(f"프롬프트 버전 '{version}'을 찾을 수 없어요.")
     return path.read_text(encoding="utf-8")

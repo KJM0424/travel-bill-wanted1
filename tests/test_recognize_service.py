@@ -40,7 +40,7 @@ def test_one_failure_does_not_stop_others():
     files = [("ok.png", png()), ("bad.pdf", b"%PDF"), ("ok2.png", png(color="red"))]
     out = recognize_batch(files, MockRecognizer(), "v1", {})
     assert [o.error is None for o in out] == [True, False, True]
-    assert "이미지 파일이 아닙니다" in out[1].error
+    assert "이미지 파일이 아니에요" in out[1].error
 
 
 def test_keeps_input_order():

@@ -11,6 +11,9 @@ from ui import state
 from ui.layout import bottom_button
 
 PROMPT_VERSION = "v1"
+# 업로더에서 형식을 막으면 Streamlit 영어 툴팁만 보이므로, 받은 뒤 직접 걸러 한국어로 안내한다.
+IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".heic")
+NOT_IMAGE_NOTICE = "{name}: 이미지 파일만 올릴 수 있어요 (JPG·PNG·HEIC)"
 DATA_NOTICE = (
     "사진은 Google Gemini API로 보내 내용을 읽어요. 카드번호와 이름은 가리고 올려 주세요. "
     "사진은 서버에 저장하지 않아요."
@@ -30,6 +33,11 @@ def process_uploads(
             f"한 번에 {MAX_FILES}장까지 올릴 수 있어요. 지금 {len(files)}장을 골랐어요."
         ]
         return
+    skipped = [name for name, _ in files if not name.lower().endswith(IMAGE_EXTENSIONS)]
+    files = [(name, raw) for name, raw in files if name.lower().endswith(IMAGE_EXTENSIONS)]
+    store["upload_notices"] = [NOT_IMAGE_NOTICE.format(name=name) for name in skipped]
+    if not files:
+        return
     try:
         recognizer = state.get_recognizer()
     except RecognitionError as e:
@@ -44,7 +52,7 @@ def process_uploads(
         outcomes, trip, existing_ids={e.expense_id for e in trip.expenses}
     )
     state.set_trip(trip.model_copy(update={"expenses": sort_expenses([*trip.expenses, *expenses])}))
-    store["upload_notices"] = notes
+    store["upload_notices"] += notes
     store["upload_added"] = len(expenses)
 
 
@@ -54,8 +62,7 @@ def render_upload() -> None:
     has_expenses = bool(state.get_trip().expenses)
     with st.form("upload_form", clear_on_submit=True, border=False):
         files = st.file_uploader(
-            f"영수증·예약 캡처 사진 (한 번에 {MAX_FILES}장까지)",
-            type=["jpg", "jpeg", "png", "heic"],
+            f"영수증·예약 캡처 사진 (JPG·PNG·HEIC, 한 번에 {MAX_FILES}장까지)",
             accept_multiple_files=True,
         )
         # 아직 결제 건이 없으면 '읽기'가 이 화면의 주요 버튼이다.

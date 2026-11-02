@@ -88,7 +88,7 @@ def test_not_receipt_and_foreign_currency_are_excluded_with_notice():
 
 def test_failed_outcome_becomes_notice():
     _, notes = build_expenses([failed_outcome("x.jpg", "AI 호출 실패")], prepaid_trip)
-    assert any("x.jpg" in n and "수동" in n for n in notes)
+    assert any("x.jpg" in n and "직접 추가" in n for n in notes)
 
 
 def test_missing_amount_becomes_zero_with_warning():
