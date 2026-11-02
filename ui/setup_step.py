@@ -5,7 +5,8 @@ from datetime import date
 import streamlit as st
 from pydantic import ValidationError
 
-from core.schema import Trip
+from core.payment_message import BANKS, clean_account_number, match_bank, split_old_account
+from core.schema import PayoutInfo, Trip
 from ui.layout import bottom_button, flash
 from ui.result_step import import_trip
 from ui.state import (
@@ -31,11 +32,12 @@ MODE_HELP = {
 }
 # 저장 버튼은 위젯 상태를 지우면 안 된다.
 SETUP_BUTTON_KEYS = ("setup_save",)
-PAYOUT_FIELDS = [
-    ("bank_account", "계좌 (은행 계좌번호 예금주)"),
+LINK_FIELDS = [
     ("toss_link", "토스 송금 링크"),
     ("kakaopay_link", "카카오페이 송금 링크"),
 ]
+PAYOUT_FIELDS = ["bank", "account_number", "account_holder", *(f for f, _ in LINK_FIELDS)]
+ACCOUNT_PAIR_ERROR = "은행과 계좌번호를 함께 적어 주세요."
 
 
 def parse_members(text: str) -> list[str]:
@@ -95,20 +97,62 @@ def render_setup() -> None:
     if session()["setup_mode"] == MODE_LABELS["fund"]:
         st.number_input("1인 회비 (원)", min_value=0, step=10000, key="setup_fee")
 
-    with st.expander("돈 받을 계좌·송금 링크 (선택)", icon=":material/account_balance:"):
+    leader = session().get("setup_leader")
+    if leader:
+        # 총무는 돈을 모으거나 대신 낸 사람이라 대부분 받는 쪽이다. 계좌를 접지 않고 바로 받는다.
+        st.space("small")
+        st.subheader(f"{leader}님 계좌", anchor=False)
+        st.caption("송금 메시지에 들어가고, 정산 화면에서 은행과 계좌번호만 따로 복사할 수 있어요.")
+        _account_inputs(leader)
+
+    with st.expander("송금 링크·다른 사람 계좌 (선택)", icon=":material/account_balance:"):
         if not names:
             st.caption("함께한 사람을 먼저 적어 주세요.")
         else:
             st.caption("받을 사람만 적으면 송금 메시지에 함께 들어가요.")
         for name in names:
             st.markdown(f"**{name}**")
-            for field, label in PAYOUT_FIELDS:
+            if name != leader:
+                _account_inputs(name)
+            for field, label in LINK_FIELDS:
                 key = _payout_key(name, field)
                 init_widget(key, "")
                 st.text_input(label, key=key)
 
     if bottom_button("다음", key="setup_save"):
         _save(trip, names)
+
+
+def _account_inputs(name: str) -> None:
+    bank_key = _payout_key(name, "bank")
+    init_widget(bank_key, None)
+    current = session().get(bank_key)
+    # 직접 적은 은행이나 예전 파일의 은행 이름도 고른 값으로 보여야 한다.
+    options = [*BANKS, *([current] if current and current not in BANKS else [])]
+    with st.container(horizontal=True):
+        st.selectbox(
+            "은행",
+            options,
+            key=bank_key,
+            placeholder="은행 고르기",
+            accept_new_options=True,
+        )
+        number_key = _payout_key(name, "account_number")
+        init_widget(number_key, "")
+        st.text_input("계좌번호", key=number_key, placeholder="3333-01-1234567")
+    holder_key = _payout_key(name, "account_holder")
+    init_widget(holder_key, "")
+    st.text_input("예금주", key=holder_key, placeholder=name)
+
+
+def _payout_fields(info: PayoutInfo) -> dict[str, str | None]:
+    """화면 칸에 채울 값. 예전 한 칸 형식 계좌는 은행·번호·예금주로 나눠 채운다."""
+    fields = {f: getattr(info, f) for f in PAYOUT_FIELDS}
+    old = split_old_account(info.bank_account) if info.bank_account else None
+    if old and not info.account_number:
+        bank, number, holder = old
+        fields |= {"bank": match_bank(bank), "account_number": number, "account_holder": holder}
+    return fields
 
 
 def _init_from_trip(trip: Trip | None) -> None:
@@ -128,27 +172,41 @@ def _init_from_trip(trip: Trip | None) -> None:
     init_widget("setup_mode", MODE_LABELS[trip.mode])
     init_widget("setup_fee", trip.fund_per_person)
     for name, info in trip.payout.items():
-        for field, _ in PAYOUT_FIELDS:
-            init_widget(_payout_key(name, field), getattr(info, field) or "")
+        for field, value in _payout_fields(info).items():
+            init_widget(_payout_key(name, field), value if field == "bank" else value or "")
 
 
 def _payout_key(name: str, field: str) -> str:
     return f"{SETUP_WIDGET_PREFIX}pay_{name}_{field}"
 
 
-def _collect_payout(names: list[str]) -> dict[str, dict[str, str | None]]:
-    payout = {}
+def _collect_payout(names: list[str]) -> tuple[dict[str, dict[str, str | None]], list[str]]:
+    """(사람별 송금 정보, 오류 문장). 계좌는 은행과 번호가 함께 있어야 하고 번호 형식이 맞아야 한다."""
+    payout, errors = {}, []
     for name in names:
         info = {
-            f: (session().get(_payout_key(name, f)) or "").strip() or None for f, _ in PAYOUT_FIELDS
+            f: (session().get(_payout_key(name, f)) or "").strip() or None for f in PAYOUT_FIELDS
         }
+        if info["bank"] or info["account_number"]:
+            if not (info["bank"] and info["account_number"]):
+                errors.append(f"{name}: {ACCOUNT_PAIR_ERROR}")
+            else:
+                try:
+                    info["account_number"] = clean_account_number(info["account_number"])
+                except ValueError as e:
+                    errors.append(f"{name}: {e}")
         if any(info.values()):
             payout[name] = info
-    return payout
+    return payout, errors
 
 
 def _save(previous: Trip | None, names: list[str]) -> None:
     state = session()
+    payout, errors = _collect_payout(names)
+    for message in errors:
+        st.error(message)
+    if errors:
+        return
     mode = MODE_BY_LABEL[state["setup_mode"]]
     data = {
         "name": state["setup_name"].strip() or "여행",
@@ -158,7 +216,7 @@ def _save(previous: Trip | None, names: list[str]) -> None:
         "fund_per_person": int(state.get("setup_fee") or 0) if mode == "fund" else 0,
         "start_date": state["setup_start"],
         "end_date": state["setup_end"],
-        "payout": _collect_payout(names),
+        "payout": payout,
         "expenses": [e.model_dump() for e in previous.expenses] if previous else [],
     }
     try:
