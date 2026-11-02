@@ -30,6 +30,13 @@ AI 호출 없이 검토·정산·여행 돌아보기를 바로 보여 주려면 
 - 결제자는 재민·수아·민호가 나눠 냈고, 첫날 카페에는 민호가 빠졌다. 총무 재민의 계좌(예시 번호)가 들어 있다.
 - 영수증 설정(`eval/synthetic_specs.json`)을 바꾸면 `python -m eval.make_synthetic --font <ttf>` 뒤에 `python -m eval.make_demo_trip`으로 다시 만든다. 둘이 어긋나면 테스트가 실패한다.
 
+### 시연 영상
+`docs/demo/travill-demo.mp4`(1분 48초, 1920×1080, 한국어 음성·자막). 인식은 이 컴퓨터의 로컬 모델(Ollama)로 했고, 배포판은 Gemini API를 쓴다. 다시 만들려면:
+1. Playwright를 앱과 다른 환경에 설치한다: `python -m venv videoenv && videoenv/bin/pip install playwright && videoenv/bin/python -m playwright install chromium`
+2. `RECOGNIZER=ollama .venv/bin/streamlit run app.py --server.port 8630`
+3. `videoenv/bin/python scripts/record_demo.py --out docs/demo/raw`로 녹화한다(장면 시각은 `docs/demo/raw/marks.json`).
+4. `.venv/bin/python scripts/make_demo_video.py`로 편집한다. 대본은 `docs/demo/script.md`이고 음성은 macOS `say -v Yuna`다.
+
 ### 휴대폰에서 앱처럼 쓰기
 휴대폰 브라우저의 "홈 화면에 추가"를 쓰면 주소창 없이 앱처럼 열린다(`static/manifest.json`). 배포판(Streamlit Community Cloud)은 앱을 틀(iframe) 안에 넣어 보여 줘서 적용되지 않을 수 있다.
 
