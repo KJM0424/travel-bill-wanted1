@@ -29,9 +29,11 @@ RECOGNIZER=mock .venv/bin/streamlit run app.py
 |---|---|
 | `GEMINI_API_KEY` | Gemini API 키. [Google AI Studio](https://aistudio.google.com/apikey)에서 발급한다 |
 | `GEMINI_MODEL` | 비우면 `gemini-3.5-flash` |
-| `RECOGNIZER` | `gemini` 또는 `mock`. 비우면 `gemini` |
+| `RECOGNIZER` | `gemini`, `ollama`(이 컴퓨터의 로컬 모델, 로컬 전용), `mock`. 비우면 `gemini` |
+| `OLLAMA_MODEL` | `RECOGNIZER=ollama`일 때 모델. 비우면 `qwen3-vl:8b-instruct` |
+| `OLLAMA_HOST` | Ollama 서버 주소. 비우면 `http://localhost:11434` |
 | `APP_PASSWORD` | 데모 비밀번호. 비우면 비밀번호 화면을 건너뛴다 |
-| `KAKAO_REST_API_KEY` | 경로 지도(다음 단계)용. [카카오 개발자](https://developers.kakao.com/)에서 발급한다. 지금 화면에서는 쓰지 않는다 |
+| `KAKAO_REST_API_KEY` | 경로 지도용. [카카오 개발자](https://developers.kakao.com/)에서 발급하고, 앱 설정에서 카카오맵(지도·로컬) 사용을 켠다. 없으면 지도 대신 안내만 나온다 |
 
 `.env`와 `.streamlit/secrets.toml`은 커밋하지 않는다(`.gitignore`에 있음).
 
@@ -40,8 +42,17 @@ RECOGNIZER=mock .venv/bin/streamlit run app.py
 .venv/bin/pytest                                              # 단위 테스트 + 화면 테스트(AppTest)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/python -m eval.run_eval --prompt v1                 # 인식 정확도 (Gemini 키 필요)
+.venv/bin/python -m eval.run_eval --prompt v1 --recognizer ollama   # 로컬 모델 (Ollama 필요)
 .venv/bin/python -m eval.run_eval --prompt v1 --recognizer mock
 ```
+
+### 로컬 모델(Ollama)
+Gemini 대신 이 컴퓨터에서 도는 비전 모델로 인식한다. 호출 한도와 비용이 없고 사진이 외부로 나가지 않는다. Streamlit Cloud에는 GPU가 없어 배포판에서는 쓰지 않는다.
+1. [Ollama](https://ollama.com/download)를 설치하고 실행한다.
+2. `ollama pull qwen3-vl:8b-instruct` (6.2GB, 실행 중 메모리 약 10GB)
+3. `RECOGNIZER=ollama .venv/bin/streamlit run app.py`
+
+`qwen3-vl:8b`(thinking 버전)는 답하기 전에 생각 단계를 거쳐 같은 영수증에 약 3배 오래 걸린다.
 정답 라벨링 규칙은 `eval/LABELING.md`에 있다. 실물 영수증 사진(`eval/images/real/`)은 커밋하지 않는다.
 
 ## Streamlit Community Cloud 배포

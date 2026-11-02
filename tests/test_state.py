@@ -68,6 +68,17 @@ def test_get_recognizer_gemini_without_key_raises(monkeypatch):
         get_recognizer()
 
 
+def test_get_recognizer_ollama_uses_settings(monkeypatch):
+    from core.recognizer.ollama import OllamaRecognizer
+
+    monkeypatch.setenv("RECOGNIZER", "ollama")
+    monkeypatch.setenv("OLLAMA_MODEL", "qwen3-vl:8b")
+    monkeypatch.setenv("OLLAMA_HOST", "http://pc.local:11434")
+    recognizer = get_recognizer()
+    assert isinstance(recognizer, OllamaRecognizer)
+    assert recognizer.model == "qwen3-vl:8b" and recognizer.host == "http://pc.local:11434"
+
+
 def test_add_members_to_expenses_checks_new_member_everywhere():
     t = trip_with([exp(9000, "A", ["A", "B"])], members=["A", "B"])
     t = sync_members(t, ["A", "B", "C"], leader="A")

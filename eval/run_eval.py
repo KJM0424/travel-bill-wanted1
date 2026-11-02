@@ -76,6 +76,13 @@ def mismatch_lines(rows: list[dict]) -> list[str]:
 def _make_recognizer(kind: str) -> Recognizer:
     if kind == "mock":
         return MockRecognizer()
+    if kind == "ollama":
+        from core.recognizer.ollama import DEFAULT_HOST, DEFAULT_MODEL, OllamaRecognizer
+
+        return OllamaRecognizer(
+            model=get_setting("OLLAMA_MODEL", DEFAULT_MODEL),
+            host=get_setting("OLLAMA_HOST", DEFAULT_HOST),
+        )
     from core.recognizer.gemini import DEFAULT_MODEL, GeminiRecognizer
 
     return GeminiRecognizer(
@@ -86,7 +93,7 @@ def _make_recognizer(kind: str) -> Recognizer:
 def main() -> None:
     parser = argparse.ArgumentParser(description="영수증 인식 정확도 평가")
     parser.add_argument("--prompt", required=True, help="프롬프트 버전 (예: v1)")
-    parser.add_argument("--recognizer", choices=["gemini", "mock"], default="gemini")
+    parser.add_argument("--recognizer", choices=["gemini", "ollama", "mock"], default="gemini")
     parser.add_argument("--limit", type=int, help="앞에서부터 N건만 평가")
     args = parser.parse_args()
 
@@ -96,7 +103,8 @@ def main() -> None:
         raise SystemExit(str(e)) from None
     entries = json.loads(GROUND_TRUTH_PATH.read_text(encoding="utf-8"))[: args.limit]
     rows = evaluate(entries, recognizer, args.prompt, IMAGES_DIR)
-    stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    # 같은 프롬프트로 인식기만 바꿔 비교하므로 결과 파일 이름에 인식기를 남긴다.
+    stamp = f"{datetime.now().strftime('%Y%m%d-%H%M')}_{args.recognizer}"
     raw_path, csv_path = save_results(rows, args.prompt, RESULTS_DIR, stamp)
 
     print(summarize(rows).round(3).to_string())

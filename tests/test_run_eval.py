@@ -48,3 +48,12 @@ def test_save_results_writes_json_and_csv(tmp_path):
         raw_path.name == "v1_20261102-1200.json" and csv_path.name == "v1_20261102-1200_summary.csv"
     )
     assert json.loads(raw_path.read_text(encoding="utf-8"))[0]["file"] == "real/r01.jpg"
+
+
+def test_make_recognizer_supports_ollama(monkeypatch):
+    from core.recognizer.ollama import OllamaRecognizer
+    from eval.run_eval import _make_recognizer
+
+    monkeypatch.setenv("OLLAMA_MODEL", "qwen3-vl:8b")
+    recognizer = _make_recognizer("ollama")
+    assert isinstance(recognizer, OllamaRecognizer) and recognizer.model == "qwen3-vl:8b"

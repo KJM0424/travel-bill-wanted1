@@ -505,6 +505,17 @@ def test_screens_do_not_show_recognizer_name(monkeypatch):
     assert not any("인식기" in t for t in texts)
 
 
+def test_upload_notice_says_local_when_ollama(monkeypatch):
+    monkeypatch.setenv("RECOGNIZER", "ollama")
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.session_state["trip"] = trip_with([])
+    at.session_state["step"] = "업로드"
+    at.run()
+    captions = [c.value for c in at.caption]
+    assert any("이 컴퓨터" in c for c in captions)
+    assert not any("Gemini" in c for c in captions)
+
+
 def test_mock_badge_only_when_mock(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[], step="업로드")
     assert any("체험 모드" in m.value for m in at.markdown)

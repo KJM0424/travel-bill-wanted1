@@ -18,6 +18,7 @@ DATA_NOTICE = (
     "사진은 Google Gemini API로 보내 내용을 읽어요. 카드번호와 이름은 가리고 올려 주세요. "
     "사진은 서버에 저장하지 않아요."
 )
+LOCAL_DATA_NOTICE = "사진은 이 컴퓨터의 AI 모델로 읽어요. 외부로 보내지 않아요."
 
 
 def process_uploads(
@@ -58,7 +59,7 @@ def process_uploads(
 
 def render_upload() -> None:
     st.header("영수증을 올려 주세요", anchor=False)
-    st.caption(DATA_NOTICE)
+    st.caption(LOCAL_DATA_NOTICE if state.recognizer_name() == "ollama" else DATA_NOTICE)
     has_expenses = bool(state.get_trip().expenses)
     with st.form("upload_form", clear_on_submit=True, border=False):
         files = st.file_uploader(
