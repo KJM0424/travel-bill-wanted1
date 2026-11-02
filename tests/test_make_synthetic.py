@@ -81,3 +81,71 @@ def test_regenerate_replaces_old_synthetic_entries(tmp_path, korean_font):
         "paid_at": "2026-10-11T15:02",
         "total_amount": 9000,
     }
+
+
+REAL_SPEC = SPEC | {
+    "merchant": "인디고인디드",
+    "phone": "064-799-1218",
+    "card": "신한카드",
+}
+
+
+def _text(lines: list[tuple[str, str]]) -> str:
+    return "\n".join(f"{left} {right}" for left, right in lines)
+
+
+def test_receipt_lines_look_like_a_real_receipt():
+    from eval.make_synthetic import receipt_lines
+
+    text = _text(receipt_lines(REAL_SPEC))
+    assert "인디고인디드" in text and "064-799-1218" in text
+    assert "승인번호" in text and "신한카드" in text and "결제금액" in text
+
+
+def test_receipt_card_number_is_masked():
+    import re
+
+    from eval.make_synthetic import receipt_lines
+
+    text = _text(receipt_lines(REAL_SPEC))
+    card = re.search(r"\d{4}-[\d*]{4}-[\d*]{4}-\d{4}", text)
+    assert card and "*" in card.group(0)
+    assert not re.search(r"\d{16}|\d{4}-\d{4}-\d{4}-\d{4}", text)
+
+
+def test_receipt_vat_adds_up_to_total():
+    from eval.make_synthetic import vat_split
+
+    supply, vat = vat_split(9000)
+    assert supply + vat == 9000 and supply == 8182
+
+
+def test_receipt_lines_are_stable_for_same_spec():
+    from eval.make_synthetic import receipt_lines
+
+    assert receipt_lines(REAL_SPEC) == receipt_lines(REAL_SPEC)
+
+
+def test_receipt_groups_repeated_items_by_quantity():
+    from eval.make_synthetic import receipt_lines
+
+    spec = REAL_SPEC | {"items": [{"name": "고기국수", "amount": 9000}] * 2, "discount": 0}
+    rows = [left for left, _ in receipt_lines(spec)]
+    assert sum("고기국수" in r for r in rows) == 1 and any(
+        "2" in r for r in rows if "고기국수" in r
+    )
+
+
+def test_booking_lines_have_reservation_details():
+    from eval.make_synthetic import booking_lines
+
+    spec = REAL_SPEC | {
+        "doc_type": "booking_capture",
+        "merchant": "호텔더본 제주",
+        "paid_at": "2026-10-11",
+        "checkin": "2026-10-11",
+        "checkout": "2026-10-12",
+    }
+    text = _text(booking_lines(spec))
+    assert "호텔더본 제주" in text and "예약번호" in text and "체크인" in text
+    assert "2026.10.11" in text
