@@ -8,7 +8,9 @@ from core.expense_builder import build_expenses, sort_expenses
 from core.recognize_service import MAX_FILES, recognize_batch
 from core.recognizer import RecognitionError
 from ui import state
+from ui.access import PASSWORD_NEEDED, ai_unlocked, render_password_gate
 from ui.layout import bottom_button
+from ui.start_step import demo_button
 
 PROMPT_VERSION = "v2"
 # 업로더에서 형식을 막으면 Streamlit 영어 툴팁만 보이므로, 받은 뒤 직접 걸러 한국어로 안내한다.
@@ -31,6 +33,10 @@ def process_uploads(
     store["upload_notices"] = []
     store["upload_error"] = None
     store["upload_added"] = 0
+    if not ai_unlocked():
+        # 화면을 거치지 않고 불러도 비밀번호 없이는 AI(비용·하루 한도)를 부르지 않는다.
+        store["upload_error"] = PASSWORD_NEEDED
+        return
     if len(files) > MAX_FILES:
         store["upload_notices"] = [
             f"한 번에 {MAX_FILES}장까지 올릴 수 있어요. 지금 {len(files)}장을 골랐어요."
@@ -63,6 +69,11 @@ def render_upload() -> None:
     st.header("영수증 사진을 올려 주세요", anchor=False)
     st.caption(NOTICES.get(state.recognizer_name(), DATA_NOTICE))
     has_expenses = bool(state.get_trip().expenses)
+    if not render_password_gate():
+        st.caption("비밀번호가 없으면 예시 여행으로 모든 화면을 둘러볼 수 있어요.")
+        demo_button("upload_demo")
+        _render_manual_link()
+        return
     # key를 붙인 컨테이너로 감싸야 업로드 칸 CSS(ui/layout.py)가 이 화면에만 적용된다.
     with st.container(key="upload_box"), st.form("upload_form", clear_on_submit=True, border=False):
         files = st.file_uploader(
@@ -93,6 +104,12 @@ def render_upload() -> None:
             st.rerun()
 
     _render_outcome()
+    _render_manual_link()
+    if state.get_trip().expenses:
+        bottom_button("다음", key="upload_next", on_click=state.go_to, args=("검토",))
+
+
+def _render_manual_link() -> None:
     st.button(
         "영수증 없이 직접 적을게요",
         key="upload_manual",
@@ -100,8 +117,6 @@ def render_upload() -> None:
         on_click=state.go_to,
         args=("검토",),
     )
-    if state.get_trip().expenses:
-        bottom_button("다음", key="upload_next", on_click=state.go_to, args=("검토",))
 
 
 def _render_outcome() -> None:

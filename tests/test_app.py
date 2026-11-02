@@ -17,25 +17,59 @@ from ui.setup_step import load_trip_file
 from ui.upload_step import process_uploads
 
 
-def test_password_gate_blocks(monkeypatch):
+def open_with_password(monkeypatch, step: str | None = None) -> AppTest:
+    """배포판처럼 APP_PASSWORD가 있는 앱. step을 주면 그 화면에서 연다."""
+    monkeypatch.setenv("RECOGNIZER", "mock")
     monkeypatch.setenv("APP_PASSWORD", "pw")
-    at = AppTest.from_file(APP_PATH).run()
-    assert at.text_input[0].label == "데모 비밀번호"
-    assert not _has_button(at, "setup_save")
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    if step:
+        at.session_state["trip"] = trip_with([])
+        at.session_state["step"] = step
+    return at.run()
 
 
-def test_password_gate_opens_with_right_password(monkeypatch):
+def _labels(at: AppTest) -> list[str]:
+    return [b.label for b in at.button]
+
+
+def test_start_screen_needs_no_password(monkeypatch):
+    # 둘러보기는 비용이 들지 않으므로 비밀번호 없이 들어온다.
+    at = open_with_password(monkeypatch)
+    assert _has_button(at, "start_begin") and _has_button(at, "start_demo")
+    assert not any(t.label == "데모 비밀번호" for t in at.text_input)
+
+
+def test_demo_tour_loads_example_trip_without_password(monkeypatch):
+    at = open_with_password(monkeypatch)
+    at.button(key="start_demo").click().run()
+    assert at.session_state["step"] == "검토"
+    assert len(at.session_state["trip"].expenses) == 13
+    assert [t.value for t in at.toast] == ["예시 여행을 불러왔어요. 결제 13건을 둘러보세요."]
+
+
+def test_upload_asks_password_before_ai_reads(monkeypatch):
+    at = open_with_password(monkeypatch, step="업로드")
+    assert any(t.label == "데모 비밀번호" for t in at.text_input)
+    assert "영수증 읽기" not in _labels(at) and _has_button(at, "upload_demo")
+
+
+def test_upload_opens_with_right_password(monkeypatch):
+    at = open_with_password(monkeypatch, step="업로드")
+    at.text_input(key="password").input("pw").run()
+    assert "영수증 읽기" in _labels(at)
+
+
+def test_upload_rejects_wrong_password(monkeypatch):
+    at = open_with_password(monkeypatch, step="업로드")
+    at.text_input(key="password").input("nope").run()
+    assert "영수증 읽기" not in _labels(at) and at.error
+
+
+def test_process_uploads_refuses_ai_without_password(app_session, monkeypatch):
+    # 화면을 거치지 않고 불러도 비밀번호 없이는 AI를 부르지 않는다.
     monkeypatch.setenv("APP_PASSWORD", "pw")
-    at = AppTest.from_file(APP_PATH).run()
-    at.text_input[0].input("pw").run()
-    assert _has_button(at, "start_begin")
-
-
-def test_password_gate_rejects_wrong_password(monkeypatch):
-    monkeypatch.setenv("APP_PASSWORD", "pw")
-    at = AppTest.from_file(APP_PATH).run()
-    at.text_input[0].input("nope").run()
-    assert not _has_button(at, "setup_save") and at.error
+    process_uploads([("a.png", png())])
+    assert app_session["upload_error"] and not app_session["trip"].expenses
 
 
 def test_setup_rejects_duplicate_members(monkeypatch):
