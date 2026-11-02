@@ -1,7 +1,7 @@
 """결제 건의 주소·상호명을 좌표(lat, lng)로 바꾼다."""
 
 import math
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
@@ -38,48 +38,68 @@ def geocode(
     if not api_key:
         return None
     with _session_scope(session) as s:
-        client = KakaoLocalClient(api_key, s)
-        address = _search_address(client, expense)
+        lookup = _Lookup(KakaoLocalClient(api_key, s))
+        address = lookup.address(expense)
         if address.coords:
             return address.coords
-        return _search_keyword(client, expense, near=None).coords
+        return lookup.keyword(expense, near=None).coords
 
 
 def geocode_trip(
-    expenses: list[Expense],
-    api_key: str,
-    session: requests.Session | None = None,
-    known: dict[str, Coords] | None = None,
+    expenses: list[Expense], api_key: str, session: requests.Session | None = None
 ) -> dict[str, GeoResult]:
     """지도에 올릴 결제만 expense_id별로 변환한다. expenses는 시간순으로 넘긴다.
 
     주소로 찾은 결제가 있으면, 주소가 없거나 못 찾은 결제의 상호명 검색은
     시간순으로 가장 가까운 '주소로 찾은 지점' 근처로 제한한다.
     흔한 상호명(예: 스타벅스)이 엉뚱한 지역을 찍는 일을 줄인다.
-    known(expense_id → 좌표)에 있는 건은 다시 조회하지 않고 기준 지점으로만 쓴다.
-    모든 요청은 session 하나로 보낸다.
+    모든 요청은 session 하나로 보내고, 한 번 실패하면(키 오류·한도 초과·네트워크)
+    남은 요청은 보내지 않고 실패로 표시한다.
     """
-    known = known or {}
     api_key = api_key.strip()
     targets = [e for e in expenses if is_mappable(e)]
     if not api_key or not targets:
         return {}
     with _session_scope(session) as s:
-        client = KakaoLocalClient(api_key, s)
-        by_address = [
-            GeoResult(known[e.expense_id]) if e.expense_id in known else _search_address(client, e)
-            for e in targets
-        ]
+        lookup = _Lookup(KakaoLocalClient(api_key, s))
+        by_address = [lookup.address(e) for e in targets]
         anchors = [(i, r.coords) for i, r in enumerate(by_address) if r.coords]
         results: dict[str, GeoResult] = {}
         for i, (expense, address) in enumerate(zip(targets, by_address, strict=True)):
             if address.coords:
                 results[expense.expense_id] = address
                 continue
-            keyword = _search_keyword(client, expense, near=_nearest_anchor(i, anchors))
+            keyword = lookup.keyword(expense, near=_nearest_anchor(i, anchors))
             failed = keyword.coords is None and (address.failed or keyword.failed)
             results[expense.expense_id] = GeoResult(keyword.coords, failed)
         return results
+
+
+class _Lookup:
+    """주소·상호명 검색. 요청이 한 번 실패하면 이후 검색은 요청 없이 실패로 돌려준다."""
+
+    def __init__(self, client: KakaoLocalClient):
+        self._client = client
+        self._stopped = False
+
+    def address(self, expense: Expense) -> GeoResult:
+        address = (expense.merchant_address or "").strip()
+        if not address:
+            return GeoResult(None)
+        return self._run(lambda: self._client.search_address(address))
+
+    def keyword(self, expense: Expense, near: Coords | None) -> GeoResult:
+        merchant = expense.merchant_name.strip()
+        if not merchant:
+            return GeoResult(None)
+        return self._run(lambda: self._client.search_keyword(merchant, near=near))
+
+    def _run(self, search: Callable[[], list[dict] | None]) -> GeoResult:
+        if self._stopped:
+            return GeoResult(None, failed=True)
+        result = _to_result(search())
+        self._stopped = result.failed
+        return result
 
 
 @contextmanager
@@ -99,20 +119,6 @@ def _nearest_anchor(index: int, anchors: list[tuple[int, Coords]]) -> Coords | N
     if not anchors:
         return None
     return min(anchors, key=lambda a: abs(a[0] - index))[1]
-
-
-def _search_address(client: KakaoLocalClient, expense: Expense) -> GeoResult:
-    address = (expense.merchant_address or "").strip()
-    if not address:
-        return GeoResult(None)
-    return _to_result(client.search_address(address))
-
-
-def _search_keyword(client: KakaoLocalClient, expense: Expense, near: Coords | None) -> GeoResult:
-    merchant = expense.merchant_name.strip()
-    if not merchant:
-        return GeoResult(None)
-    return _to_result(client.search_keyword(merchant, near=near))
 
 
 def _to_result(documents: list[dict] | None) -> GeoResult:
