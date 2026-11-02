@@ -14,3 +14,6 @@ eval/results/*.json
 
 # 실행 계획 작업 공간
 .superpowers/
+
+# macOS
+.DS_Store

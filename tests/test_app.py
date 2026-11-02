@@ -26,7 +26,7 @@ def test_password_gate_opens_with_right_password(monkeypatch):
     monkeypatch.setenv("APP_PASSWORD", "pw")
     at = AppTest.from_file(APP_PATH).run()
     at.text_input[0].input("pw").run()
-    assert _has_button(at, "setup_save")
+    assert _has_button(at, "start_begin")
 
 
 def test_password_gate_rejects_wrong_password(monkeypatch):
@@ -76,13 +76,9 @@ def test_setup_resave_syncs_expenses(monkeypatch):
 
 def test_later_steps_need_trip(monkeypatch):
     at = open_app(monkeypatch)
-    at.radio(key="step").set_value("정산").run()
+    at.session_state["step"] = "정산"
+    at.run()
     assert any("여행 설정" in i.value for i in at.info)
-
-
-def test_sidebar_shows_recognizer(monkeypatch):
-    at = open_app(monkeypatch)
-    assert any("mock" in c.value for c in at.sidebar.caption)
 
 
 def _has_button(at: AppTest, key: str) -> bool:
@@ -238,7 +234,7 @@ def test_review_exclude(monkeypatch):
 
 def test_review_shows_duplicate_warning(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[dup_a, dup_b])
-    assert any("중복" in w.value for w in at.warning)
+    assert any("10분 안에" in w.value for w in at.warning)
 
 
 def test_review_shows_expense_warnings(monkeypatch):
@@ -368,6 +364,7 @@ def test_setup_readding_member_checks_them_on_existing_expenses(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(9000, "A", ["A", "B", "C"])], step="설정")
     at.text_input(key="setup_members").input("A, B").run()
     at.button(key="setup_save").click().run()
+    at.button(key="nav_back").click().run()
     at.text_input(key="setup_members").input("A, B, C").run()
     at.button(key="setup_save").click().run()
     assert at.session_state["trip"].expenses[0].participants == ["A", "B", "C"]
@@ -385,3 +382,158 @@ def test_import_rejects_duplicate_expense_ids():
     t = trip_with([exp(1000, "A", ["A"], id="x"), exp(2000, "A", ["A"], id="x")])
     with pytest.raises(ValueError, match="불러올 수 없는"):
         import_trip(export_trip(t))
+
+
+# --- PR #4에서 넘어온 Minor ---
+
+
+def test_review_date_change_resorts_expenses(monkeypatch):
+    first = exp(1000, "A", ["A"], id="x1", merchant="아침", paid_at=DUP_TIME, time_known=True)
+    second = exp(
+        2000,
+        "A",
+        ["A"],
+        id="x2",
+        merchant="저녁",
+        paid_at=DUP_TIME + timedelta(hours=5),
+        time_known=True,
+    )
+    at = open_app_with_trip(monkeypatch, expenses=[first, second])
+    at.date_input(key="rv_date_x2").set_value((DUP_TIME - timedelta(days=1)).date()).run()
+    assert [e.expense_id for e in at.session_state["trip"].expenses] == ["x2", "x1"]
+
+
+def test_load_trip_file_clears_previous_upload_notices(app_session):
+    app_session["upload_notices"] = ["a.png: 영수증이 아니어서 제외했습니다."]
+    app_session["upload_error"] = "오류"
+    app_session["upload_added"] = 2
+    assert load_trip_file(export_trip(prepaid_trip_with_expenses())) is None
+    assert not app_session.get("upload_notices")
+    assert not app_session.get("upload_error") and not app_session.get("upload_added")
+
+
+def test_review_unchecking_time_unknown_does_not_set_midnight(monkeypatch):
+    no_time = exp(1000, "A", ["A"], id="t", paid_at=datetime(2026, 10, 11), time_known=False)
+    at = open_app_with_trip(monkeypatch, expenses=[no_time])
+    at.checkbox(key="rv_notime_t").uncheck().run()
+    assert at.session_state["trip"].expenses[0].time_known is False
+    at.time_input(key="rv_time_t").set_value(datetime(2026, 10, 11, 9, 30).time()).run()
+    e = at.session_state["trip"].expenses[0]
+    assert e.time_known and e.paid_at == datetime(2026, 10, 11, 9, 30)
+
+
+def test_setup_allows_trailing_comma_in_members(monkeypatch):
+    at = open_app(monkeypatch)
+    fill_setup(at, members="민수, 지영,")
+    at.button(key="setup_save").click().run()
+    assert at.session_state["trip"].members == ["민수", "지영"]
+
+
+def test_setup_still_rejects_empty_name_between_commas(monkeypatch):
+    at = open_app(monkeypatch)
+    fill_setup(at, members="민수,, 지영")
+    at.button(key="setup_save").click().run()
+    assert at.error and "trip" not in at.session_state
+
+
+def test_review_many_members_do_not_use_one_column_each(monkeypatch):
+    members = ["A", *(f"친구{i}" for i in range(9))]
+    at = open_app_with_trip(
+        monkeypatch, expenses=[exp(10000, "A", members, id="m")], members=members
+    )
+    # 사람 수만큼 칸을 나누면 칸이 좁아져 이름이 글자 단위로 줄바꿈된다.
+    in_columns = [w for col in at.columns for w in col.children.values()]
+    assert not any(str(getattr(w, "key", "")).startswith("part_") for w in in_columns)
+    assert all(at.checkbox(key=f"part_m_{m}").value for m in members)
+
+
+def test_setup_leader_follows_member_changes(monkeypatch):
+    at = open_app(monkeypatch)
+    fill_setup(at, members="A, B")
+    at.text_input(key="setup_members").input("B, C").run()
+    leader_box = next(s for s in at.selectbox if s.label == "대표 (총무)")
+    assert (leader_box.options, leader_box.value) == (["B", "C"], "B")
+    at.button(key="setup_save").click().run()
+    assert at.session_state["trip"].leader == "B"
+
+
+def test_setup_leader_keeps_choice_when_members_grow(monkeypatch):
+    at = open_app(monkeypatch)
+    fill_setup(at, members="A, B")
+    next(s for s in at.selectbox if s.label == "대표 (총무)").set_value("B").run()
+    at.text_input(key="setup_members").input("A, B, C").run()
+    at.button(key="setup_save").click().run()
+    assert at.session_state["trip"].leader == "B"
+
+
+# --- 화면 다듬기: 시작 화면·진행 표시·주요 버튼 ---
+
+
+def test_start_screen_shows_name_and_one_start_button(monkeypatch):
+    from ui.branding import APP_NAME
+
+    monkeypatch.setenv("RECOGNIZER", "mock")
+    monkeypatch.setenv("APP_PASSWORD", "")
+    at = AppTest.from_file(APP_PATH, default_timeout=30).run()
+    assert any(APP_NAME in t.value for t in at.title)
+    assert [b.key for b in at.button if b.proto.type == "primary"] == ["start_begin"]
+    at.button(key="start_begin").click().run()
+    assert _has_button(at, "setup_save")
+
+
+def test_screens_do_not_show_recognizer_name(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[], step="업로드")
+    texts = [e.value for e in [*at.caption, *at.markdown, *at.info]]
+    assert not any("인식기" in t for t in texts)
+
+
+def test_mock_badge_only_when_mock(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[], step="업로드")
+    assert any("체험 모드" in m.value for m in at.markdown)
+    monkeypatch.setenv("RECOGNIZER", "gemini")
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.session_state["trip"] = trip_with([])
+    at.session_state["step"] = "업로드"
+    at.run()
+    assert not any("체험 모드" in m.value for m in at.markdown)
+
+
+@pytest.mark.parametrize(
+    ("step", "label"),
+    [("설정", "1/4 설정"), ("업로드", "2/4 영수증"), ("검토", "3/4 확인"), ("정산", "4/4 정산")],
+)
+def test_progress_shows_step(monkeypatch, step, label):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(9000, "A", ["A", "B", "C"])], step=step)
+    assert any(label in p.text for p in at.get("progress"))
+
+
+def test_setup_save_moves_to_upload(monkeypatch):
+    at = open_app(monkeypatch)
+    fill_setup(at, members="민수, 지영")
+    at.button(key="setup_save").click().run()
+    assert at.session_state["step"] == "업로드"
+
+
+def test_back_button_goes_to_previous_step(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[], step="업로드")
+    at.button(key="nav_back").click().run()
+    assert at.session_state["step"] == "설정"
+
+
+def test_each_step_has_one_primary_button(monkeypatch):
+    for step in ["설정", "업로드", "검토"]:
+        at = open_app_with_trip(monkeypatch, expenses=[exp(9000, "A", ["A", "B", "C"])], step=step)
+        assert len([b for b in at.button if b.proto.type == "primary"]) == 1, step
+
+
+def test_result_shows_person_cards(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
+    texts = " ".join(m.value for m in [*at.markdown, *at.caption])
+    assert "받을 돈" in texts and "보낼 돈" in texts and "20,000원" in texts
+
+
+def test_transfer_message_starts_with_app_name(monkeypatch):
+    from ui.branding import APP_NAME
+
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
+    assert at.code and all(c.value.splitlines()[0] == f"[{APP_NAME}]" for c in at.code)

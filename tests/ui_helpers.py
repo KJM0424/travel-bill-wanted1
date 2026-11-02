@@ -49,7 +49,9 @@ def trip_with(
 def open_app(monkeypatch) -> AppTest:
     monkeypatch.setenv("RECOGNIZER", "mock")
     monkeypatch.setenv("APP_PASSWORD", "")
-    return AppTest.from_file(APP_PATH, default_timeout=30).run()
+    at = AppTest.from_file(APP_PATH, default_timeout=30).run()
+    # 시작 화면에서 '정산 시작하기'를 눌러 설정 화면으로 간다.
+    return at.button(key="start_begin").click().run()
 
 
 def open_app_with_trip(
@@ -66,7 +68,7 @@ def open_app_with_trip(
 def fill_setup(at: AppTest, members: str, mode: str = "선결제형", fee: int = 0) -> AppTest:
     at.text_input(key="setup_name").input("제주").run()
     at.text_input(key="setup_members").input(members).run()
-    at.radio(key="setup_mode").set_value(mode).run()
+    at.segmented_control(key="setup_mode").set_value(mode).run()
     if mode == "회비형":
         at.number_input(key="setup_fee").set_value(fee).run()
     return at
