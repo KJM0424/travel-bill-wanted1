@@ -65,12 +65,12 @@ def load_trip_file(data: bytes) -> str | None:
 
 def render_setup() -> None:
     st.header("여행 정보를 알려 주세요", anchor=False)
-    st.caption("질문 네 가지에 답하면 영수증을 올릴 수 있어요.")
+    st.caption("몇 가지만 알려 주면 영수증을 올릴 수 있어요.")
     trip = get_trip()
     _init_from_trip(trip)
 
     # 질문 하나에 카드 하나(ui/layout.py의 .st-key-sec_ CSS). 무엇을 채워야 하는지 한눈에 보이게 한다.
-    with _section("sec_trip", "어디로 다녀왔나요?"):
+    with _section("sec_trip", "어떤 여행이었나요?"):
         st.text_input("여행 이름 (선택)", key="setup_name", placeholder="제주 2박 3일")
         with st.container(horizontal=True):
             st.date_input("가는 날", key="setup_start")
@@ -264,10 +264,20 @@ def _save(previous: Trip | None, names: list[str]) -> None:
     if count and added:
         flash(
             "info",
-            f"{', '.join(added)}님을 결제 {count}건의 참석자로 추가했어요. "
-            "빠진 결제는 확인 단계에서 체크를 풀어 주세요.",
+            f"{', '.join(added)}님을 결제 {count}건에 함께한 사람으로 넣었어요. "
+            "함께하지 않은 결제는 결제 내역에서 빼 주세요.",
         )
     if count and removed:
-        flash("info", f"{', '.join(removed)}님을 모든 결제의 참석자·결제자에서 뺐어요.")
+        flash("info", _removed_notice(removed, previous, trip.leader))
     go_to("업로드")
     st.rerun()
+
+
+def _removed_notice(removed: list[str], previous: Trip | None, leader: str) -> str:
+    """뺀 사람이 결제한 건은 총무가 낸 것으로 바뀐다(sync_members). 그 사실도 함께 알린다."""
+    names = ", ".join(removed)
+    notice = f"{names}님을 모든 결제에서 뺐어요."
+    paid = [m for m in removed if previous and any(e.payer == m for e in previous.expenses)]
+    if paid:
+        notice += f" {', '.join(paid)}님이 결제한 건은 총무 {leader}님이 낸 것으로 바꿨어요."
+    return notice

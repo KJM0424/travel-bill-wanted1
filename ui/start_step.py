@@ -1,4 +1,4 @@
-"""시작 화면: 무엇을 하는 앱인지 세 단계로 보여 주고 '정산 시작하기' 버튼 하나를 둔다."""
+"""시작 화면: 무엇을 하는 앱인지 네 단계로 보여 주고 '정산 시작하기' 버튼 하나를 둔다."""
 
 import streamlit as st
 
@@ -12,9 +12,11 @@ STEPS_HTML = """
   <li><span class="tv-num">1</span><div><b>영수증을 한 번에 올려요</b>
     <span>종이 영수증도, 숙소 예약 캡처도 괜찮아요</span></div></li>
   <li><span class="tv-num">2</span><div><b>안 간 사람만 빼요</b>
-    <span>카페에 빠진 친구는 이름만 누르면 돼요</span></div></li>
+    <span>결제를 눌러 빠진 친구 이름만 빼면 돼요</span></div></li>
   <li><span class="tv-num">3</span><div><b>송금 메시지를 보내요</b>
     <span>누가 누구에게 얼마를 보낼지 정리해 드려요</span></div></li>
+  <li><span class="tv-num">4</span><div><b>여행을 돌아봐요</b>
+    <span>다녀온 곳을 지도로 다시 보고, 어디에 얼마 썼는지 한눈에 봐요</span></div></li>
 </ol>
 """
 

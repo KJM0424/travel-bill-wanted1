@@ -111,7 +111,7 @@ def test_missing_amount_becomes_zero_with_warning():
 
 def test_missing_merchant_gets_placeholder_name():
     exps, _ = build_expenses([outcome(receipt(merchant=None))], prepaid_trip)
-    assert exps[0].merchant_name and any("상호" in w for w in exps[0].warnings)
+    assert exps[0].merchant_name and any("가게 이름" in w for w in exps[0].warnings)
 
 
 def test_wrong_year_corrected_to_trip_year():

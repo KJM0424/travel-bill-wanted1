@@ -88,4 +88,5 @@ def test_unexpected_error_in_one_file_does_not_stop_others():
     files = [("ok.png", png()), ("red.png", png(color="red"))]
     out = recognize_batch(files, FailsOnRed(), "v1", {})
     assert out[0].receipt is not None
-    assert out[1].receipt is None and "boom" in out[1].error
+    assert out[1].receipt is None and out[1].error == "이 사진을 처리하다 문제가 생겼어요."
+    assert "boom" not in out[1].error

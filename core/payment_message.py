@@ -85,7 +85,7 @@ def _account_line(payout: PayoutInfo) -> str | None:
 
 
 def payout_owner(transfer: Transfer, trip: Trip) -> str:
-    """돈을 실제로 받는 사람. 회비 지갑으로 보내는 돈은 대표가 받는다."""
+    """돈을 실제로 받는 사람. 회비 지갑으로 보내는 돈은 총무가 받는다."""
     return trip.leader if transfer.receiver == FUND_WALLET else transfer.receiver
 
 
@@ -106,9 +106,11 @@ def build_message(transfer: Transfer, trip: Trip) -> str:
     amount = format_won(transfer.amount)
     receiver = transfer.receiver
     if transfer.sender == FUND_WALLET:
-        first = f"[{trip.name}] 대표 {trip.leader}님이 {receiver}님께 회비 {amount}을 환급해요."
+        first = (
+            f"[{trip.name}] 총무 {trip.leader}님이 {receiver}님께 남은 회비 {amount}을 돌려드려요."
+        )
     elif receiver == FUND_WALLET:
-        first = f"[{trip.name}] {transfer.sender}님 → {FUND_WALLET}(대표 {trip.leader}) {amount}"
+        first = f"[{trip.name}] {transfer.sender}님 → {FUND_WALLET}(총무 {trip.leader}) {amount}"
     else:
         first = f"[{trip.name}] {transfer.sender}님 → {receiver}님 {amount}"
 

@@ -10,6 +10,8 @@ from core.recognizer import RecognitionError, Recognizer
 from core.schema import Receipt
 
 MAX_FILES = 30
+# 예상하지 못한 오류. 영어 원문은 보여 주지 않는다.
+UNEXPECTED_ERROR = "이 사진을 처리하다 문제가 생겼어요."
 
 
 @dataclass
@@ -67,7 +69,7 @@ def _recognize_one(
             receipt = recognizer.recognize(image, prompt_version)
     except (UnsupportedImageError, RecognitionError) as e:
         error = str(e)
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         # 예상하지 못한 오류도 이 파일만 실패로 처리하고 나머지는 계속한다.
-        error = f"처리 중 오류: {type(e).__name__}: {e}"
+        error = UNEXPECTED_ERROR
     return RecognitionOutcome(filename, digest, receipt, error, time.perf_counter() - started)

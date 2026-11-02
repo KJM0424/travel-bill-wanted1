@@ -38,16 +38,16 @@ def readiness_errors(trip: Trip) -> list[str]:
         if expense.amount <= 0:
             errors.append(f"'{name}' 금액이 0원이에요.")
         if not expense.participants:
-            errors.append(f"'{name}' 참석자가 없어요.")
+            errors.append(f"'{name}' 함께한 사람이 없어요.")
         # 회비 지갑은 돈을 내기만 하고 부담하지 않으므로 참석자가 될 수 없다.
         outsiders = [p for p in expense.participants if p not in trip.members]
         if outsiders:
             errors.append(
-                f"'{name}' 참석자 중 여행 참석자가 아닌 사람이 있어요: {', '.join(outsiders)}"
+                f"'{name}' 함께한 사람 중 이 여행에 없는 사람이 있어요: {', '.join(outsiders)}"
             )
         # 결제자가 그 건의 참석자가 아닌 것은 허용한다(결제만 하고 먹지 않은 경우).
         if expense.payer not in valid_payers:
-            errors.append(f"'{name}' 결제자가 여행 참석자가 아니에요.")
+            errors.append(f"'{name}' 결제한 사람이 이 여행에 없어요.")
     return errors
 
 

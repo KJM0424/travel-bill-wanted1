@@ -83,14 +83,14 @@ class Trip(BaseModel):
     def _check_members(cls, members: list[str]) -> list[str]:
         names = [m.strip() for m in members]
         if not names:
-            raise ValueError("참석자를 1명 이상 입력해 주세요.")
+            raise ValueError("함께한 사람을 1명 이상 적어 주세요.")
         if any(not n for n in names):
-            raise ValueError("빈 참석자 이름이 있어요.")
+            raise ValueError("이름이 비어 있는 사람이 있어요.")
         if FUND_WALLET in names:
-            raise ValueError(f"'{FUND_WALLET}'은 참석자 이름으로 쓸 수 없어요.")
+            raise ValueError(f"'{FUND_WALLET}'은 이름으로 쓸 수 없어요.")
         duplicates = sorted({n for n in names if names.count(n) > 1})
         if duplicates:
-            raise ValueError(f"참석자 이름이 중복돼요: {', '.join(duplicates)}")
+            raise ValueError(f"같은 이름이 두 번 있어요: {', '.join(duplicates)}")
         return names
 
     @field_validator("leader")
@@ -101,9 +101,9 @@ class Trip(BaseModel):
     @model_validator(mode="after")
     def _check_trip(self) -> "Trip":
         if self.leader not in self.members:
-            raise ValueError(f"대표 '{self.leader}'가 참석자 목록에 없어요.")
+            raise ValueError(f"총무 '{self.leader}'가 함께한 사람에 없어요.")
         if self.end_date < self.start_date:
-            raise ValueError("여행 종료일이 시작일보다 빨라요.")
+            raise ValueError("오는 날이 가는 날보다 빨라요.")
         if self.mode == "fund" and self.fund_per_person <= 0:
             raise ValueError("회비형은 1인 회비를 0원보다 크게 입력해 주세요.")
         return self

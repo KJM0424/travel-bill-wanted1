@@ -18,7 +18,7 @@ MESSAGES = {
     "daily_quota": "오늘 쓸 수 있는 AI 횟수를 다 썼어요. 내일 다시 읽을 수 있어요.",
     "rate_limit": "AI 요청이 한꺼번에 몰렸어요. 1분쯤 뒤에 다시 올려 주세요.",
     "busy": "AI 서버가 바빠서 응답하지 않아요. 잠시 뒤에 다시 올려 주세요.",
-    "no_model": "AI 모델 '{model}'을 쓸 수 없어요. 앱 설정의 GEMINI_MODEL을 확인해 주세요.",
+    "no_model": "쓸 수 없는 AI 모델이에요: {model}. 앱 설정의 GEMINI_MODEL을 확인해 주세요.",
     "network": "AI 서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 올려 주세요.",
     "server": "AI 서버에서 오류가 났어요(HTTP {code}). 잠시 뒤에 다시 올려 주세요.",
 }

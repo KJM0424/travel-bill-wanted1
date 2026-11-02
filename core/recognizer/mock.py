@@ -12,7 +12,7 @@ class MockRecognizer:
     def __init__(self, fixtures_dir: Path = DEFAULT_FIXTURES_DIR):
         paths = sorted(Path(fixtures_dir).glob("*.json"))
         if not paths:
-            raise ValueError(f"fixture가 없습니다: {fixtures_dir}")
+            raise ValueError(f"미리 저장한 인식 결과가 없어요: {fixtures_dir}")
         self._fixtures = [Receipt.model_validate_json(p.read_text(encoding="utf-8")) for p in paths]
 
     def recognize(self, image: bytes, prompt_version: str) -> Receipt:

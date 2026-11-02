@@ -42,7 +42,7 @@ def test_setup_rejects_duplicate_members(monkeypatch):
     at = open_app(monkeypatch)
     fill_setup(at, members="민수, 민수")
     at.button(key="setup_save").click().run()
-    assert "중복" in at.error[0].value
+    assert "두 번" in at.error[0].value
     assert "Value error" not in at.error[0].value
 
 
@@ -80,7 +80,7 @@ def test_later_steps_need_trip(monkeypatch):
     at = open_app(monkeypatch)
     at.session_state["step"] = "정산"
     at.run()
-    assert any("여행 설정" in i.value for i in at.info)
+    assert any("여행 정보" in i.value for i in at.info)
 
 
 def _has_button(at: AppTest, key: str) -> bool:
@@ -342,7 +342,7 @@ def test_result_blocked_when_not_ready(monkeypatch):
 
 def test_result_blocked_when_participants_empty(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(1000, "A", [])], step="정산")
-    assert any("참석자가 없어요" in e.value for e in at.error) and not at.exception
+    assert any("함께한 사람이 없어요" in e.value for e in at.error) and not at.exception
 
 
 def test_result_errors_distinguish_same_merchant(monkeypatch):
@@ -370,7 +370,9 @@ def test_result_fund_leader_shortfall_shown_separately(monkeypatch):
         fee=10000,
     )
     assert len(at.code) == 2 and not any("A님 →" in c.value for c in at.code)
-    assert any("대표가 직접 채울 금액" in i.value and "2,000원" in i.value for i in at.info)
+    assert any(
+        "모자라요" in i.value and "총무" in i.value and "2,000원" in i.value for i in at.info
+    )
 
 
 def test_result_fund_leader_refund_shown_separately(monkeypatch):
@@ -382,7 +384,9 @@ def test_result_fund_leader_refund_shown_separately(monkeypatch):
         fee=10000,
     )
     assert len(at.code) == 2 and not any("A님께" in c.value for c in at.code)
-    assert any("대표" in i.value and "2,000원" in i.value for i in at.info)
+    assert any(
+        "남았어요" in i.value and "총무" in i.value and "2,000원" in i.value for i in at.info
+    )
 
 
 def test_result_has_download_button(monkeypatch):
@@ -420,7 +424,7 @@ def test_setup_readding_member_checks_them_on_existing_expenses(monkeypatch):
     at.text_input(key="setup_members").input("A, B, C").run()
     at.button(key="setup_save").click().run()
     assert at.session_state["trip"].expenses[0].participants == ["A", "B", "C"]
-    assert any("C" in i.value and "추가" in i.value for i in at.info)
+    assert any("C" in i.value and "넣었어요" in i.value for i in at.info)
 
 
 def test_setup_removing_member_is_reported(monkeypatch):
@@ -604,7 +608,7 @@ def test_result_person_card_says_my_share(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
     open_people_tab(at)
     captions = [c.value for c in at.caption]
-    assert "낸 돈 30,000원, 내 몫 10,000원" in captions
+    assert "낸 돈 30,000원, 나눌 몫 10,000원" in captions
     assert not any("쓴 돈" in c for c in captions)
 
 
@@ -1077,3 +1081,60 @@ def test_setup_counts_members_as_typed(monkeypatch):
     at = open_app(monkeypatch)
     at.text_input(key="setup_members").input("민수, 지영, 철수").run()
     assert any("3명" in m.value for m in [*at.markdown, *at.caption])
+
+
+# --- 문구 검토(2026-11-02) ---
+
+
+def test_upload_failure_box_does_not_miscount_grouped_files(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[], step="업로드")
+    at.session_state["upload_notices"] = [
+        "a.jpg 외 12장: 읽지 못했어요. 이유. 직접 추가할 수도 있어요."
+    ]
+    at.run()
+    titles = [w.proto.title for w in at.warning]
+    assert "결제로 넣지 못한 사진이 있어요" in titles and not any("1장" in t for t in titles)
+
+
+def test_start_screen_says_to_tap_payment_first(monkeypatch):
+    from ui.start_step import STEPS_HTML
+
+    assert "결제를 눌러" in STEPS_HTML and "이름만 누르면" not in STEPS_HTML
+
+
+def test_setup_first_card_asks_about_the_trip(monkeypatch):
+    at = open_app(monkeypatch)
+    texts = [m.value for m in [*at.markdown, *at.caption]]
+    assert "#### 어떤 여행이었나요?" in texts
+    assert not any("네 가지" in t for t in texts)
+
+
+def test_setup_added_member_notice_points_to_payment_list(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="설정")
+    at.text_input(key="setup_members").input("A, B, C, D").run()
+    at.button(key="setup_save").click().run()
+    notes = " ".join(i.value for i in at.info)
+    assert "결제 내역에서 빼 주세요" in notes and "체크" not in notes
+
+
+def test_setup_removed_payer_notice_says_leader_took_over(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "C", ["A", "B", "C"])], step="설정")
+    at.text_input(key="setup_members").input("A, B").run()
+    at.button(key="setup_save").click().run()
+    notes = " ".join(i.value for i in at.info)
+    assert "C님이 결제한 건은 총무 A님이 낸 것으로 바꿨어요" in notes
+
+
+def test_map_popup_says_how_many_joined():
+    from ui.map_view import _stop
+
+    e = place("e1", "흑돼지", 12)
+    trip = trip_with([e], members=["A", "B"])
+    assert _stop(e, (33.4, 126.3), 0, trip).people == "2명 모두"
+
+
+def test_start_screen_lists_four_steps_including_trip_review():
+    from ui.start_step import STEPS_HTML
+
+    assert STEPS_HTML.count("<li>") == 4
+    assert "여행을 돌아봐요" in STEPS_HTML and "지도" in STEPS_HTML

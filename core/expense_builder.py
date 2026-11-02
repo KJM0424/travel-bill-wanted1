@@ -7,7 +7,7 @@ from core.recognize_service import RecognitionOutcome
 from core.schema import FUND_WALLET, Expense, Receipt, Trip, parse_paid_at
 
 DUPLICATE_WINDOW = timedelta(minutes=10)
-UNKNOWN_MERCHANT = "상호 미상"
+UNKNOWN_MERCHANT = "가게 이름 없음"
 
 
 def build_expenses(
@@ -62,12 +62,12 @@ def _unique_id(base: str, used: set[str]) -> str:
 def _to_expense(receipt: Receipt, expense_id: str, digest: str, trip: Trip) -> Expense:
     warnings = list(receipt.warnings)
     if receipt.total_amount is None:
-        warnings.append("금액을 인식하지 못했어요. 직접 입력해 주세요.")
+        warnings.append("금액을 읽지 못했어요. 직접 적어 주세요.")
     if not receipt.merchant_name:
-        warnings.append("상호를 인식하지 못했어요.")
+        warnings.append("가게 이름을 읽지 못했어요.")
     paid_at, time_known = parse_paid_at(receipt.paid_at)
     if receipt.paid_at and paid_at is None:
-        warnings.append(f"결제 일시를 해석하지 못했어요: {receipt.paid_at}")
+        warnings.append(f"결제 날짜를 읽지 못했어요({receipt.paid_at}). 직접 고쳐 주세요.")
     if paid_at is not None:
         paid_at, date_warnings = _check_trip_dates(paid_at, trip)
         warnings.extend(date_warnings)

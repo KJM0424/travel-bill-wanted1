@@ -59,9 +59,7 @@ GEO_CACHE_KEY = "geo_cache"
 # 다시 그릴 때마다 카카오를 다시 부르지도 않도록 정해 둔 시간 동안만 재사용한다.
 RETRY_FAILED_SECONDS = 30
 RETRY_NOT_FOUND_SECONDS = 600
-NO_KEY_INFO = (
-    "카카오 키가 없어서 지도를 보여 줄 수 없어요. KAKAO_REST_API_KEY를 넣으면 경로가 보여요."
-)
+NO_KEY_INFO = "지도를 보려면 카카오 지도 설정이 필요해요. 정산은 그대로 할 수 있어요."
 LOAD_ERROR = "위치를 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요."
 MARKER_HTML = (
     '<div style="width:30px;height:30px;border-radius:50%;background:{color};color:#fff;'
@@ -445,7 +443,7 @@ def _stop(expense: Expense, coords: tuple[float, float], day: int, trip: Trip) -
         category=expense.category,
         when=_when(expense.paid_at, expense.time_known),
         amount=expense.amount,
-        people="모두" if everyone else ", ".join(expense.participants),
+        people=f"{len(trip.members)}명 모두" if everyone else ", ".join(expense.participants),
     )
 
 
