@@ -1,0 +1,273 @@
+{
+  "name": "제주 2박 3일",
+  "members": [
+    "재민",
+    "수아",
+    "민호"
+  ],
+  "leader": "재민",
+  "mode": "prepaid",
+  "fund_per_person": 0,
+  "start_date": "2026-10-10",
+  "end_date": "2026-10-12",
+  "payout": {
+    "재민": {
+      "bank": "카카오뱅크",
+      "account_number": "3333-01-1234567",
+      "account_holder": "김재민",
+      "bank_account": null,
+      "toss_link": null,
+      "kakaopay_link": null
+    }
+  },
+  "expenses": [
+    {
+      "expense_id": "s01",
+      "source": "ai",
+      "merchant_name": "브라운캐빈",
+      "merchant_address": "제주특별자치도 제주시 애월읍 소길남길 190-40",
+      "paid_at": "2026-09-28T00:00:00",
+      "time_known": false,
+      "amount": 180000,
+      "category": "lodging",
+      "payer": "재민",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": [
+        "결제 날짜가 여행 기간 밖이에요."
+      ]
+    },
+    {
+      "expense_id": "s03",
+      "source": "ai",
+      "merchant_name": "제일렌트카 공항점",
+      "merchant_address": "제주특별자치도 제주시 용해로 80-27",
+      "paid_at": "2026-10-10T00:00:00",
+      "time_known": false,
+      "amount": 120000,
+      "category": "transport",
+      "payer": "재민",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    },
+    {
+      "expense_id": "s04",
+      "source": "ai",
+      "merchant_name": "삼대전통고기국수",
+      "merchant_address": "제주특별자치도 제주시 신대로5길 17",
+      "paid_at": "2026-10-10T12:31:00",
+      "time_known": true,
+      "amount": 40500,
+      "category": "food",
+      "payer": "수아",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    },
+    {
+      "expense_id": "s08",
+      "source": "ai",
+      "merchant_name": "인디고인디드",
+      "merchant_address": "제주특별자치도 제주시 애월읍 애월해안로 204",
+      "paid_at": "2026-10-10T15:42:00",
+      "time_known": true,
+      "amount": 18500,
+      "category": "cafe",
+      "payer": "수아",
+      "participants": [
+        "재민",
+        "수아"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    },
+    {
+      "expense_id": "s05",
+      "source": "ai",
+      "merchant_name": "애월농협하나로마트",
+      "merchant_address": "제주특별자치도 제주시 애월읍 애원로 41",
+      "paid_at": "2026-10-10T18:05:00",
+      "time_known": true,
+      "amount": 24480,
+      "category": "shopping",
+      "payer": "민호",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    },
+    {
+      "expense_id": "s02",
+      "source": "ai",
+      "merchant_name": "호텔더본 제주",
+      "merchant_address": "제주특별자치도 서귀포시 색달로 18",
+      "paid_at": "2026-10-11T00:00:00",
+      "time_known": false,
+      "amount": 120000,
+      "category": "lodging",
+      "payer": "재민",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    },
+    {
+      "expense_id": "s07",
+      "source": "ai",
+      "merchant_name": "중문생선구이 중문본점",
+      "merchant_address": "제주특별자치도 서귀포시 중문관광로 323",
+      "paid_at": "2026-10-11T19:20:00",
+      "time_known": true,
+      "amount": 96000,
+      "category": "food",
+      "payer": "민호",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    },
+    {
+      "expense_id": "s10",
+      "source": "ai",
+      "merchant_name": "CU 중문오션클라우드점",
+      "merchant_address": "제주특별자치도 서귀포시 천제연로178번길 26",
+      "paid_at": "2026-10-11T22:47:00",
+      "time_known": true,
+      "amount": 8700,
+      "category": "shopping",
+      "payer": "수아",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    },
+    {
+      "expense_id": "s11",
+      "source": "ai",
+      "merchant_name": "이마트 서귀포점",
+      "merchant_address": "제주특별자치도 서귀포시 일주동로 9209",
+      "paid_at": "2026-10-12T08:50:00",
+      "time_known": true,
+      "amount": 35680,
+      "category": "shopping",
+      "payer": "민호",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    },
+    {
+      "expense_id": "s06",
+      "source": "ai",
+      "merchant_name": "섭지해녀의집",
+      "merchant_address": "제주특별자치도 서귀포시 성산읍 섭지코지로 93-15",
+      "paid_at": "2026-10-12T11:40:00",
+      "time_known": true,
+      "amount": 40000,
+      "category": "food",
+      "payer": "수아",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    },
+    {
+      "expense_id": "s13",
+      "source": "ai",
+      "merchant_name": "성산포항우도도항선매표소",
+      "merchant_address": "제주특별자치도 서귀포시 성산읍 성산등용로 130-21",
+      "paid_at": "2026-10-12T13:00:00",
+      "time_known": true,
+      "amount": 16500,
+      "category": "transport",
+      "payer": "재민",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    },
+    {
+      "expense_id": "s09",
+      "source": "ai",
+      "merchant_name": "우도샌드",
+      "merchant_address": "제주특별자치도 제주시 우도면 우도해안길 780-2",
+      "paid_at": "2026-10-12T14:10:00",
+      "time_known": true,
+      "amount": 17000,
+      "category": "cafe",
+      "payer": "민호",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    },
+    {
+      "expense_id": "s12",
+      "source": "ai",
+      "merchant_name": "유공주유소",
+      "merchant_address": "제주특별자치도 제주시 노형로 364",
+      "paid_at": "2026-10-12T17:40:00",
+      "time_known": true,
+      "amount": 52000,
+      "category": "transport",
+      "payer": "재민",
+      "participants": [
+        "재민",
+        "수아",
+        "민호"
+      ],
+      "excluded": false,
+      "image_hash": null,
+      "warnings": []
+    }
+  ]
+}

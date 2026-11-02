@@ -149,3 +149,46 @@ def test_booking_lines_have_reservation_details():
     text = _text(booking_lines(spec))
     assert "호텔더본 제주" in text and "예약번호" in text and "체크인" in text
     assert "2026.10.11" in text
+
+
+# --- 시연용 여행 일정(eval/synthetic_specs.json) ---
+
+TRIP_DAYS = ["2026-10-10", "2026-10-11", "2026-10-12"]
+# 지도에 찍히지 않는 종류(교통비는 한 장소가 아니다. core/geocode.is_mappable)
+UNMAPPED_KINDS = {"transport", "fuel"}
+# 동서로 긴 제주에서 지역을 서→동 순서로 나눈다. 주소에 들어 있는 낱말로 판단한다.
+AREA_ORDER = ["애월", "제주시", "중문", "서귀포", "성산", "우도"]
+
+
+def demo_specs() -> list[dict]:
+    return json.loads(Path("eval/synthetic_specs.json").read_text(encoding="utf-8"))
+
+
+def area_of(spec: dict) -> str:
+    address = spec["address"]
+    for area in ["애월", "중문", "색달", "천제연", "성산", "우도"]:
+        if area in address:
+            return {"색달": "중문", "천제연": "중문"}.get(area, area)
+    return "서귀포" if "서귀포" in address else "제주시"
+
+
+def test_every_trip_day_has_at_least_two_places_on_the_map():
+    for day in TRIP_DAYS:
+        places = [
+            s
+            for s in demo_specs()
+            if s["paid_at"].startswith(day) and s["kind"] not in UNMAPPED_KINDS
+        ]
+        assert len(places) >= 2, day
+
+
+def test_days_move_west_to_east_without_crossing_the_island():
+    # 하루 안에서 지역이 서→동 한 방향으로만 움직이면 다시 보기 경로가 섬을 왕복하지 않는다.
+    # 앱처럼 날짜만 있는 결제(예약 캡처)를 그날 맨 앞에 두고 본다(core/expense_builder.sort_expenses).
+    for day in TRIP_DAYS:
+        ordered = sorted(
+            (s for s in demo_specs() if s["paid_at"].startswith(day)),
+            key=lambda s: ("T" in s["paid_at"], s["paid_at"]),
+        )
+        steps = [AREA_ORDER.index(area_of(s)) for s in ordered if s["kind"] not in UNMAPPED_KINDS]
+        assert steps == sorted(steps) or steps == sorted(steps, reverse=True), (day, steps)

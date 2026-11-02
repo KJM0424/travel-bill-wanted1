@@ -188,6 +188,34 @@ class _Replay(MacroElement):
         self.label = REPLAY_LABEL
 
 
+class _Refit(MacroElement):
+    """지도 칸 크기가 정해진 뒤, 그리고 화면 크기가 바뀔 때마다 범위를 다시 맞춘다.
+
+    st_folium은 지도를 그린 뒤에 칸 크기를 바꾼다. 처음 맞춘 범위가 작은 칸 기준이라
+    지도가 한쪽으로 치우쳐 동쪽(성산·우도) 장소가 잘렸다.
+    """
+
+    _template = Template("""
+{% macro script(this, kwargs) %}
+(function () {
+  var map = {{ this._parent.get_name() }};
+  var bounds = L.latLngBounds({{ this.points }});
+  function refit() {
+    map.invalidateSize();
+    map.fitBounds(bounds, { padding: [30, 30], animate: false });
+  }
+  setTimeout(refit, 300);
+  window.addEventListener("resize", refit);
+})();
+{% endmacro %}
+""")
+
+    def __init__(self, stops: list[Stop]):
+        super().__init__()
+        self._name = "Refit"
+        self.points = json.dumps([[s.lat, s.lng] for s in stops])
+
+
 now = time.monotonic
 
 
@@ -233,6 +261,7 @@ def build_route_map(stops: list[Stop]) -> folium.Map:
     _add_day_path(route, run, stops[-1].day)
     if len(stops) > 1:
         m.fit_bounds([[s.lat, s.lng] for s in stops], padding=(30, 30))
+        _Refit(stops).add_to(m)
         _Replay(route, markers, stops).add_to(m)
     return m
 
