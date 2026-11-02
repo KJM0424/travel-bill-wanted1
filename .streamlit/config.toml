@@ -20,7 +20,7 @@ baseFontSize = 16
 baseFontWeight = 500
 codeFontSize = "15px"
 codeFontWeight = 500
-headingFontSizes = ["28px", "24px", "18px"]
+headingFontSizes = ["26px", "22px", "18px", "18px"]
 headingFontWeights = [700, 700, 700]
 
 backgroundColor = "#FFFFFF"

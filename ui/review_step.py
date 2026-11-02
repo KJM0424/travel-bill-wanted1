@@ -1,4 +1,4 @@
-"""3단계: 날짜별 결제 목록에서 참석자를 바로 고치고, 행을 펼쳐 금액·결제자 등을 고친다."""
+"""3단계: 날짜별 결제 목록. 줄을 눌러 펼치면 참석자·금액·결제자 등을 고친다."""
 
 from collections import Counter
 from datetime import date, datetime, time
@@ -85,7 +85,7 @@ def render_review() -> None:
     if not trip.expenses:
         st.info("아직 결제가 없어요. 영수증을 올리거나 아래에서 직접 추가해 주세요.")
     else:
-        st.caption("함께하지 않은 사람은 이름을 눌러 빼 주세요.")
+        st.caption("결제를 누르면 함께한 사람과 금액을 고칠 수 있어요.")
     duplicated = _render_duplicates(trip)
 
     updated: list[Expense] = []
@@ -154,39 +154,49 @@ def _render_duplicates(trip: Trip) -> set[str]:
 
 
 def _render_row(e: Expense, trip: Trip, duplicated: bool) -> Expense:
-    """결제 한 줄. 참석자는 바로 고치고, 나머지는 펼쳐서 고친다. 바뀌었으면 고친 결제 건을 돌려준다."""
+    """결제 한 줄. 줄을 누르면 참석자와 수정 칸이 펼쳐지고 다시 누르면 접힌다.
+
+    바뀌었으면 고친 결제 건을 돌려준다.
+    """
     eid = e.expense_id
     opened = eid in session().get(OPENED_KEY, set())
-    init_widget(f"part_{eid}", [m for m in trip.members if m in e.participants])
     with st.container(key=f"row_{eid}"):
-        head = st.container(horizontal=True, vertical_alignment="center", gap="small")
-        notes = st.container(gap=None)
-        participants = st.pills(
-            "함께한 사람",
-            trip.members,
-            selection_mode="multi",
-            key=f"part_{eid}",
-            label_visibility="collapsed",
+        head = st.container(
+            key=f"rh_{eid}", horizontal=True, vertical_alignment="center", gap="small"
         )
+        notes = st.container(gap=None)
         changes = _render_editor(e, trip) if opened else {}
-    updated = _apply(e, {**changes, "participants": list(participants)})
-    _fill_row_head(head, updated, opened)
+    updated = _apply(e, changes)
+    _fill_row_head(head, updated, trip, opened)
     for warning in [*e.warnings, *(["같은 결제가 하나 더 있어요."] if duplicated else [])]:
         notes.caption(f":orange[:material/error: {warning}]")
     return updated
 
 
-def _fill_row_head(head: DeltaGenerator, e: Expense, opened: bool) -> None:
+def who_joined(e: Expense, trip: Trip) -> str:
+    if not e.participants:
+        return "함께한 사람 없음"
+    if sorted(e.participants) == sorted(trip.members):
+        return f"{len(trip.members)}명 모두"
+    return ", ".join(m for m in trip.members if m in e.participants)
+
+
+def _fill_row_head(head: DeltaGenerator, e: Expense, trip: Trip, opened: bool) -> None:
     with head.container(key=f"ico_{e.expense_id}", width=40):
         st.markdown(f":material/{CATEGORY_ICONS.get(e.category, 'receipt_long')}:")
     with head.container(key=f"rt_{e.expense_id}", gap=None):
         st.markdown(f"~~{e.merchant_name}~~" if e.excluded else f"**{e.merchant_name}**")
         when = e.paid_at.strftime("%H:%M") if e.paid_at and e.time_known else "시간 모름"
-        st.caption("정산에서 뺐어요" if e.excluded else f"{when}, {e.payer} 결제")
+        detail = f"{when}, {e.payer} 결제, {who_joined(e, trip)}"
+        st.caption("정산에서 뺐어요" if e.excluded else detail)
     won = format_won(e.amount)
     head.markdown(f":gray[~~{won}~~]" if e.excluded else f"**{won}**", width="content")
+    head.markdown(
+        f":gray[:material/{'expand_less' if opened else 'expand_more'}:]", width="content"
+    )
+    # 줄 전체를 덮는 투명 버튼(ui/layout.py CSS). 화면 읽기 프로그램에는 이 이름으로 읽힌다.
     head.button(
-        "접기" if opened else "수정",
+        f"{e.merchant_name} {'접기' if opened else '펼치기'}",
         key=f"rv_open_{e.expense_id}",
         type="tertiary",
         on_click=_toggle_editor,
@@ -199,7 +209,11 @@ def _toggle_editor(eid: str) -> None:
     if eid in opened:
         opened.discard(eid)
         # 다시 펼칠 때 결제 건의 최신 값으로 채우도록 수정 칸 값을 지운다.
-        for key in [*(f"rv_{field}_{eid}" for field in EDIT_FIELDS), f"excl_{eid}"]:
+        for key in [
+            *(f"rv_{field}_{eid}" for field in EDIT_FIELDS),
+            f"excl_{eid}",
+            f"part_{eid}",
+        ]:
             session().pop(key, None)
     else:
         opened.add(eid)
@@ -216,7 +230,15 @@ def _render_editor(e: Expense, trip: Trip) -> dict:
     payer_options = [*trip.members, *([FUND_WALLET] if trip.mode == "fund" else [])]
     if e.payer not in payer_options:
         payer_options.append(e.payer)
+    init_widget(f"part_{eid}", [m for m in trip.members if m in e.participants])
     with st.container(key=f"edit_{eid}"):
+        participants = st.pills(
+            "함께한 사람",
+            trip.members,
+            selection_mode="multi",
+            key=f"part_{eid}",
+            help="함께하지 않은 사람은 눌러서 빼 주세요.",
+        )
         name = st.text_input("상호", key=f"rv_name_{eid}")
         amount = st.number_input("금액 (원)", min_value=0, step=100, key=f"rv_amount_{eid}")
         with st.container(horizontal=True, vertical_alignment="bottom"):
@@ -231,6 +253,7 @@ def _render_editor(e: Expense, trip: Trip) -> dict:
     time_known = not no_time and clock is not None
     paid_at = datetime.combine(day, clock if time_known else time(0)) if day else None
     return {
+        "participants": list(participants),
         "merchant_name": name.strip() or UNKNOWN_MERCHANT,
         "merchant_address": address.strip() or None,
         "paid_at": paid_at,

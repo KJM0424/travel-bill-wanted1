@@ -299,7 +299,6 @@ def render_map(trip: Trip) -> None:
     active = [e for e in trip.expenses if not e.excluded]
     if not active:
         return
-    st.subheader("여행 돌아보기", anchor=False)
     # 위치 조회가 끝나야 이동 거리를 알 수 있다. 자리를 먼저 잡고 나중에 채운다.
     card = st.container()
     days = group_days(active)

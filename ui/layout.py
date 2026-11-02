@@ -40,12 +40,34 @@ COLUMN_CSS = """
 [class*="st-key-part_"] button[aria-pressed="false"] p {
   color: #6B7684; text-decoration: line-through;
 }
-[class*="st-key-row_"] [data-testid="stBaseButton-tertiary"] p { color: #6B7684; font-size: 14px; }
+/* 줄 전체가 펼치기·접기 버튼이다. 투명 버튼을 줄 위에 덮고, 키보드로 왔을 때만 테두리를 보인다. */
+[class*="st-key-rh_"] { position: relative; border-radius: 12px; }
+[class*="st-key-rh_"]:hover { background: #F9FAFB; }
+[class*="st-key-rv_open_"] { position: absolute !important; inset: 0; z-index: 2; margin: 0; }
+[class*="st-key-rv_open_"] button {
+  width: 100%; height: 100%; opacity: 0; cursor: pointer; border-radius: 12px;
+}
+[class*="st-key-rv_open_"] button:focus-visible {
+  opacity: 1; color: transparent; background: transparent; outline: 2px solid #17654C;
+}
+/* 펼친 수정 칸: 입력칸(회색)과 구분되게 흰 바탕에 테두리 */
 [class*="st-key-edit_"] {
-  background: #F7F8FA; border-radius: 14px; padding: 16px; margin-top: 8px;
+  background: #FFFFFF; border: 1px solid #E5E8EB; border-radius: 14px; padding: 16px; margin-top: 8px;
 }
 [class*="st-key-day_head_"] { margin-top: 18px; }
 [class*="st-key-day_head_"] p { color: #6B7684; font-weight: 600; font-size: 14px; }
+
+/* 글씨: 본문 16px, 입력칸 이름 15px 굵게, 보조 설명 14px. 입력칸 글자는 16px라야 휴대폰에서 확대되지 않는다. */
+.st-key-page [data-testid="stWidgetLabel"] p { font-size: 15px; font-weight: 600; color: #333D4B; }
+.st-key-page [data-testid="stCaptionContainer"] { font-size: 14px; color: #6B7684; line-height: 1.5; }
+.st-key-page input, .st-key-page textarea { font-size: 16px; }
+.st-key-page h4 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 4px; }
+
+/* 설정 화면: 질문 하나에 카드 하나 */
+[class*="st-key-sec_"] {
+  border: 1px solid #E5E8EB; border-radius: 16px; padding: 18px 18px 20px; margin-bottom: 4px;
+}
+[class*="st-key-sec_"] h4 { padding-top: 0; }
 
 /* 정산 화면: 영수증 한 장처럼 아래가 톱니 모양인 요약 */
 .tv-slip {

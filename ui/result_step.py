@@ -19,6 +19,7 @@ from ui.state import get_trip, go_to
 IMPORT_ERROR = "불러올 수 없는 파일이에요. 정산 단계에서 저장한 파일인지 확인해 주세요."
 # .streamlit/config.toml의 primaryColor와 같은 값이다.
 RECEIVE_COLOR = "#17654C"
+RESULT_VIEWS = ["보낼 돈", "사람별 정산", "여행 돌아보기"]
 
 
 def export_trip(trip: Trip) -> bytes:
@@ -57,12 +58,25 @@ def render_result() -> None:
 
     st.header("이렇게 나누면 돼요", anchor=False)
     balances = compute_balances(trip)
-    st.html(summary_html(trip))
-    _render_transfers(plan_transfers(balances), trip)
-    st.subheader("사람별 정산", anchor=False)
-    _render_people(balances, trip)
-    with st.expander("표로 보기", icon=":material/table_rows:"):
-        _render_table(balances, trip)
+    # 한 화면에 다 쌓으면 길어서, 위의 버튼으로 하나씩 본다. 지도는 열 때만 위치를 찾는다.
+    view = st.segmented_control(
+        "보기",
+        RESULT_VIEWS,
+        default=RESULT_VIEWS[0],
+        key="result_view",
+        required=True,
+        width="stretch",
+        label_visibility="collapsed",
+    )
+    if view == "보낼 돈":
+        _render_transfers(plan_transfers(balances), trip)
+    elif view == "사람별 정산":
+        st.html(summary_html(trip))
+        _render_people(balances, trip)
+        with st.expander("표로 보기", icon=":material/table_rows:"):
+            _render_table(balances, trip)
+    else:
+        render_map(trip)
     bottom().download_button(
         "정산 파일 저장하기",
         export_trip(trip),
@@ -74,8 +88,6 @@ def render_result() -> None:
         icon=":material/download:",
         help="저장한 파일은 시작 화면에서 다시 불러와 이어서 고칠 수 있어요.",
     )
-    # 위치 조회가 느려도 저장 버튼이 먼저 보이도록 맨 마지막에 그린다(버튼은 화면 아래 고정이다).
-    render_map(trip)
 
 
 def summary_html(trip: Trip) -> str:
@@ -177,7 +189,6 @@ def transfer_copies(transfer: Transfer, trip: Trip) -> list[tuple[str, str]]:
 
 
 def _render_transfers(transfers: list[Transfer], trip: Trip) -> None:
-    st.subheader("보낼 돈", anchor=False)
     if not transfers:
         st.success("주고받을 돈이 없어요.")
         return
