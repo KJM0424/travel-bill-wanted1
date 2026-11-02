@@ -87,8 +87,21 @@ def test_not_receipt_and_foreign_currency_are_excluded_with_notice():
 
 
 def test_failed_outcome_becomes_notice():
-    _, notes = build_expenses([failed_outcome("x.jpg", "AI 호출 실패")], prepaid_trip)
+    _, notes = build_expenses(
+        [failed_outcome("x.jpg", "AI 서버에 연결하지 못했어요")], prepaid_trip
+    )
     assert any("x.jpg" in n and "직접 추가" in n for n in notes)
+
+
+def test_same_failure_on_many_files_is_one_notice():
+    reason = "오늘 쓸 수 있는 AI 횟수를 다 썼어요."
+    outcomes = [failed_outcome(f"{n}.jpg", reason) for n in ("a", "b", "c")]
+    outcomes.insert(1, failed_outcome("d.jpg", "이미지를 열 수 없어요."))
+    _, notes = build_expenses(outcomes, prepaid_trip)
+    assert notes == [
+        f"a.jpg 외 2장: 읽지 못했어요. {reason} 직접 추가할 수도 있어요.",
+        "d.jpg: 읽지 못했어요. 이미지를 열 수 없어요. 직접 추가할 수도 있어요.",
+    ]
 
 
 def test_missing_amount_becomes_zero_with_warning():

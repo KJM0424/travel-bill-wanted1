@@ -11,7 +11,7 @@ from core.payment_message import NO_PAYOUT_NOTICE
 from core.recognize_service import MAX_FILES, RecognitionOutcome, recognize_batch
 from core.recognizer import RecognitionError
 from core.recognizer.base import load_prompt
-from core.recognizer.gemini import RETRY_MESSAGES, GeminiRecognizer
+from core.recognizer.gemini import MESSAGES, GeminiRecognizer
 from core.schema import Expense, Receipt, Trip
 from core.settlement import readiness_errors
 
@@ -98,14 +98,14 @@ def outcome(r: Receipt | None, error: str | None = None) -> RecognitionOutcome:
 def test_build_notices():
     _, notes = build_expenses(
         [
-            outcome(None, "AI 호출 실패"),
+            outcome(None, "AI 서버에 연결하지 못했어요"),
             outcome(receipt(doc_type="not_receipt")),
             outcome(receipt(currency="JPY")),
         ],
         Trip(**TRIP),
     )
     assert notes == [
-        "a.jpg: 읽지 못했어요. AI 호출 실패. 직접 추가해 주세요.",
+        "a.jpg: 읽지 못했어요. AI 서버에 연결하지 못했어요. 직접 추가할 수도 있어요.",
         "a.jpg: 영수증이 아니어서 제외했어요.",
         "a.jpg: 원화(KRW)가 아닌 결제(JPY)라서 제외했어요.",
     ]
@@ -131,9 +131,14 @@ def test_payment_message_notice():
 
 
 def test_recognizer_messages():
-    assert RETRY_MESSAGES == {
-        429: "AI 호출 한도를 넘었어요. 잠시 후 다시 시도해 주세요.",
-        503: "AI 서버가 응답하지 않아요. 잠시 후 다시 시도해 주세요.",
+    assert MESSAGES == {
+        "bad_key": "AI 키가 맞지 않거나 쓸 권한이 없어요. 앱 설정의 GEMINI_API_KEY를 확인해 주세요.",
+        "daily_quota": "오늘 쓸 수 있는 AI 횟수를 다 썼어요. 내일 다시 읽을 수 있어요.",
+        "rate_limit": "AI 요청이 한꺼번에 몰렸어요. 1분쯤 뒤에 다시 올려 주세요.",
+        "busy": "AI 서버가 바빠서 응답하지 않아요. 잠시 뒤에 다시 올려 주세요.",
+        "no_model": "AI 모델 '{model}'을 쓸 수 없어요. 앱 설정의 GEMINI_MODEL을 확인해 주세요.",
+        "network": "AI 서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 올려 주세요.",
+        "server": "AI 서버에서 오류가 났어요(HTTP {code}). 잠시 뒤에 다시 올려 주세요.",
     }
     with pytest.raises(RecognitionError) as info:
         GeminiRecognizer("")

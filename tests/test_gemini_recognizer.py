@@ -5,7 +5,7 @@ import pytest
 from google.genai import errors
 
 from core.recognizer import RecognitionError
-from core.recognizer.gemini import HTTP_TIMEOUT_MS, GeminiRecognizer
+from core.recognizer.gemini import HTTP_TIMEOUT_MS, MESSAGES, GeminiRecognizer
 
 FIXTURES = Path(__file__).parent / "fixtures" / "receipts"
 food_json = (FIXTURES / "food.json").read_text(encoding="utf-8")
@@ -67,7 +67,7 @@ def test_retries_on_rate_limit_then_succeeds():
 
 def test_gives_up_after_rate_limit_retries():
     client = fake_client([rate_limit_error()] * 4)
-    with pytest.raises(RecognitionError, match="한도"):
+    with pytest.raises(RecognitionError, match=MESSAGES["rate_limit"]):
         GeminiRecognizer("k", client=client, sleep=lambda s: None).recognize(b"img", "v1")
     assert len(client.calls) == 4
 
@@ -79,25 +79,90 @@ def test_retries_once_on_invalid_json_then_fails():
     assert len(client.calls) == 2
 
 
-def test_other_api_error_is_wrapped_without_key():
-    leaking = errors.APIError(
-        400, {"error": {"code": 400, "message": "bad key secret-key-123", "status": "INVALID"}}
+def recognize_error(error: Exception, key: str = "k", model: str = "gemini-3.5-flash") -> str:
+    """오류 하나를 낸 뒤 사용자에게 보일 메시지를 돌려준다."""
+    client = fake_client([error] * 5)
+    recognizer = GeminiRecognizer(key, model=model, client=client, sleep=lambda s: None)
+    with pytest.raises(RecognitionError) as exc:
+        recognizer.recognize(b"img", "v1")
+    return str(exc.value)
+
+
+def invalid_key_error(key: str = "k"):
+    # 실제 Gemini 응답 모양: 400 INVALID_ARGUMENT, details에 reason API_KEY_INVALID
+    return errors.APIError(
+        400,
+        {
+            "error": {
+                "code": 400,
+                "message": f"API key not valid. Please pass a valid API key. {key}",
+                "status": "INVALID_ARGUMENT",
+                "details": [{"reason": "API_KEY_INVALID", "domain": "googleapis.com"}],
+            }
+        },
     )
-    client = fake_client([leaking])
-    with pytest.raises(RecognitionError, match="AI 호출 실패") as exc:
-        GeminiRecognizer("secret-key-123", client=client, sleep=lambda s: None).recognize(
-            b"img", "v1"
-        )
-    assert "secret-key-123" not in str(exc.value) and "***" in str(exc.value)
 
 
-def test_network_error_is_wrapped_without_key():
-    client = fake_client([ConnectionError("https://x?key=secret-key-123 timed out")])
-    with pytest.raises(RecognitionError, match="AI 호출 실패") as exc:
-        GeminiRecognizer("secret-key-123", client=client, sleep=lambda s: None).recognize(
-            b"img", "v1"
-        )
-    assert "secret-key-123" not in str(exc.value)
+def daily_quota_error():
+    return errors.APIError(
+        429,
+        {
+            "error": {
+                "code": 429,
+                "message": "You exceeded your current quota.",
+                "status": "RESOURCE_EXHAUSTED",
+                "details": [
+                    {
+                        "violations": [
+                            {"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}
+                        ]
+                    }
+                ],
+            }
+        },
+    )
+
+
+def test_invalid_key_is_korean_without_raw_response():
+    message = recognize_error(invalid_key_error("secret-key-123"), key="secret-key-123")
+    assert message == MESSAGES["bad_key"]
+    assert "secret-key-123" not in message and "INVALID_ARGUMENT" not in message
+
+
+@pytest.mark.parametrize("code", [401, 403])
+def test_permission_errors_point_to_key(code):
+    error = errors.APIError(code, {"error": {"code": code, "message": "denied", "status": "X"}})
+    assert recognize_error(error) == MESSAGES["bad_key"]
+
+
+def test_daily_quota_says_tomorrow_and_does_not_retry():
+    client = fake_client([daily_quota_error(), ok_text(food_json)])
+    sleeps: list = []
+    with pytest.raises(RecognitionError) as exc:
+        GeminiRecognizer("k", client=client, sleep=sleeps.append).recognize(b"img", "v1")
+    assert str(exc.value) == MESSAGES["daily_quota"] and "내일" in str(exc.value)
+    assert len(client.calls) == 1 and sleeps == []
+
+
+def test_per_minute_rate_limit_message_after_retries():
+    assert recognize_error(rate_limit_error()) == MESSAGES["rate_limit"]
+
+
+def test_missing_model_names_the_model_setting():
+    error = errors.APIError(404, {"error": {"code": 404, "message": "gone", "status": "NOT_FOUND"}})
+    message = recognize_error(error, model="gemini-old")
+    assert "gemini-old" in message and "GEMINI_MODEL" in message
+
+
+def test_other_server_error_shows_code_only():
+    message = recognize_error(server_error())
+    assert message == MESSAGES["server"].format(code=500)
+    assert "internal" not in message and "INTERNAL" not in message
+
+
+def test_network_error_is_korean_without_key():
+    message = recognize_error(ConnectionError("https://x?key=secret-key-123 timed out"))
+    assert message == MESSAGES["network"] and "secret-key-123" not in message
 
 
 def unavailable_error():
@@ -115,14 +180,14 @@ def test_retries_on_unavailable_then_succeeds():
 
 def test_gives_up_after_unavailable_retries():
     client = fake_client([unavailable_error()] * 4)
-    with pytest.raises(RecognitionError, match="응답하지 않아요"):
+    with pytest.raises(RecognitionError, match=MESSAGES["busy"]):
         GeminiRecognizer("k", client=client, sleep=lambda s: None).recognize(b"img", "v1")
     assert len(client.calls) == 4
 
 
 def test_server_error_500_is_not_retried():
     client = fake_client([server_error(), ok_text(food_json)])
-    with pytest.raises(RecognitionError, match="AI 호출 실패"):
+    with pytest.raises(RecognitionError):
         GeminiRecognizer("k", client=client, sleep=lambda s: None).recognize(b"img", "v1")
     assert len(client.calls) == 1
 
