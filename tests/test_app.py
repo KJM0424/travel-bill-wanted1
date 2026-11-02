@@ -1138,3 +1138,13 @@ def test_start_screen_lists_four_steps_including_trip_review():
 
     assert STEPS_HTML.count("<li>") == 4
     assert "여행을 돌아봐요" in STEPS_HTML and "지도" in STEPS_HTML
+
+
+def test_row_toggle_button_is_stretched_over_the_whole_row():
+    # Streamlit이 버튼 칸에 글자 너비를 넣어서, 너비를 강제하지 않으면 금액·화살표 쪽이 눌리지 않았다.
+    import re
+
+    from ui.layout import COLUMN_CSS
+
+    rule = re.search(r'\[class\*="st-key-rv_open_"\] \{([^}]*)\}', COLUMN_CSS).group(1)
+    assert "width: 100% !important" in rule and "height: 100% !important" in rule

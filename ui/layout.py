@@ -43,7 +43,12 @@ COLUMN_CSS = """
 /* 줄 전체가 펼치기·접기 버튼이다. 투명 버튼을 줄 위에 덮고, 키보드로 왔을 때만 테두리를 보인다. */
 [class*="st-key-rh_"] { position: relative; border-radius: 12px; }
 [class*="st-key-rh_"]:hover { background: #F9FAFB; }
-[class*="st-key-rv_open_"] { position: absolute !important; inset: 0; z-index: 2; margin: 0; }
+/* Streamlit이 버튼 칸에 글자 너비를 직접 넣어서 inset만으로는 줄을 다 덮지 못한다. 너비·높이를 강제한다. */
+[class*="st-key-rv_open_"] {
+  position: absolute !important; inset: 0; z-index: 2; margin: 0;
+  width: 100% !important; height: 100% !important;
+}
+[class*="st-key-rv_open_"] > div { width: 100% !important; height: 100% !important; }
 [class*="st-key-rv_open_"] button {
   width: 100%; height: 100%; opacity: 0; cursor: pointer; border-radius: 12px;
 }
