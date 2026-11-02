@@ -315,7 +315,7 @@ td.r, th.r { text-align: right; padding-right: 0; }
     </div>
     <div class="card grow">
       <h3>작업 방식</h3>
-      <p class="sub">Orca에서 기능마다 작업 공간(git worktree)을 따로 띄워 병렬 개발 · PR 26개 · "머지할 땐 계속 묻고 해"를 메모리에 저장해 매번 승인</p>
+      <p class="sub">Orca에서 기능마다 작업 공간(git worktree)을 따로 띄워 병렬 개발 · PR 30개 · "머지할 땐 계속 묻고 해"를 메모리에 저장해 매번 승인</p>
     </div>
   </div>
   <div class="row" style="gap:32px;margin-top:40px">
@@ -342,28 +342,35 @@ td.r, th.r { text-align: right; padding-right: 0; }
 <!-- 11. 회고 -->
 <section class="slide" data-title="회고">
   <p class="kicker">6. 회고</p>
-  <h2>한계와 다음 단계</h2>
+  <h2>잘된 것, 아쉬운 것, 다음에 바꿀 것</h2>
   <div class="row" style="gap:32px">
     <div class="card big grow">
-      <h3>한계</h3>
+      <h3>잘된 점</h3>
       <ul class="plain">
-        <li>실물 영수증 없이 생성 영수증 13장으로만 평가</li>
-        <li>원화만, 품목 단위 정산 없음</li>
-        <li>새로고침하면 정산이 사라짐(파일로 저장·불러오기)</li>
-        <li>무료 Gemini 하루 20회</li>
+        <li>규칙을 파일에 두니 PR 30개 내내 지켜짐</li>
+        <li>v1 실패를 보고 고쳐 숫자로 확인</li>
+        <li>테스트 404개가 회귀를 막음</li>
       </ul>
     </div>
     <div class="card big grow">
-      <h3>다음 단계</h3>
+      <h3>아쉬운 점</h3>
       <ul class="plain">
-        <li>실물 영수증 25장으로 다시 평가</li>
-        <li>호텔 예약 캡처의 결제 시각 규칙(v3)</li>
-        <li>해외 결제와 환율</li>
-        <li>로그인과 저장(2차 프로젝트)</li>
+        <li>실물 영수증 없이 13장만 평가</li>
+        <li>AI의 "됐다"를 바로 믿은 때</li>
+        <li>Gemini 비교를 다 못 함</li>
+      </ul>
+    </div>
+    <div class="card big grow">
+      <h3>다음에 바꿀 점</h3>
+      <ul class="plain">
+        <li>실제 데이터를 첫날 확보</li>
+        <li>실제로 누르는 곳에서 확인</li>
+        <li>API 한도·비용부터 확인</li>
       </ul>
     </div>
   </div>
-  <div class="foot"><span>Travill</span><span>11 / 12</span></div>
+  <p class="small" style="margin-top:40px">한계: 원화만, 품목 단위 정산 없음, 새로고침하면 정산이 사라짐(파일로 저장·불러오기). 다음 단계: 실물 영수증 평가, 해외 결제, 로그인과 저장.</p>
+  <div class="foot"><span>docs/ai-log.md 8장</span><span>11 / 12</span></div>
 </section>
 
 <!-- 12. 마무리 -->
