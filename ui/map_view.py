@@ -18,7 +18,7 @@ from core.expense_builder import sort_expenses
 from core.geocode import GeoResult, geocode_trip, is_mappable
 from core.payment_message import format_won
 from core.schema import Category, Expense, Trip
-from core.trip_story import TripStats, group_days, route_km, summarize_trip
+from core.trip_story import TripStats, curve_points, group_days, route_km, summarize_trip
 from ui.state import session
 
 # 1일차는 .streamlit/config.toml의 primaryColor(여권 초록)다. 지도 바탕(OSM) 위에서 서로 구분되는 색만 골랐다.
@@ -30,7 +30,9 @@ MAP_HEIGHT = 450
 ALL_DAYS = "전체"
 DAY_KEY = "map_day"
 REPLAY_LABEL = "여행 다시 보기"
-REPLAY_STEP_MS = 700
+# 다시 보기에서 한 구간을 달리는 시간과 장소에 도착한 뒤 쉬는 시간
+REPLAY_LEG_MS = 1100
+REPLAY_PAUSE_MS = 250
 # folium이 기본으로 불러오는 Font Awesome 6 아이콘 이름이다.
 CATEGORY_ICONS: dict[Category, str] = {
     "food": "fa-utensils",
@@ -91,10 +93,11 @@ class Stop:
 
 
 class _Replay(MacroElement):
-    """'여행 다시 보기' 버튼. 누르면 경로를 지우고 결제 순서대로 마커와 선을 하나씩 다시 그린다.
+    """'여행 다시 보기' 버튼. 누르면 경로를 지우고, 자동차가 결제 순서대로 곡선을 따라 달리며 선을 다시 그린다.
 
     folium 기본 플러그인(TimestampedGeoJson)은 실제 시간 단위로 움직여 빈 시간대가 길고
     외부 스크립트를 여러 개 더 불러와서, Leaflet만으로 직접 만든다.
+    구간마다 거리와 관계없이 같은 시간(LEG_MS)을 쓰고, 출발·도착에서 천천히 움직이게 한다.
     """
 
     _template = Template("""
@@ -103,27 +106,56 @@ class _Replay(MacroElement):
   var map = {{ this._parent.get_name() }};
   var route = {{ this.route.get_name() }};
   var markers = [{{ this.marker_names }}];
-  var coords = {{ this.coords }};
   var legs = {{ this.legs }};
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var stepMs = reduce ? 0 : {{ this.step_ms }};
-  var timer = null, layer = null;
+  var legMs = reduce ? 0 : {{ this.leg_ms }};
+  var pauseMs = reduce ? 0 : {{ this.pause_ms }};
+  var timer = null, frame = null, layer = null;
+  var carIcon = L.divIcon({
+    html: '<div class="tv-car" style="width:34px;height:34px;border-radius:50%;background:#fff;' +
+      'color:#17654C;display:flex;align-items:center;justify-content:center;font-size:17px;' +
+      'box-shadow:0 2px 6px rgba(0,0,0,.35);"><i class="fa-solid fa-car-side"></i></div>',
+    className: "", iconSize: [34, 34], iconAnchor: [17, 17]
+  });
   function reset() {
     clearTimeout(timer);
+    cancelAnimationFrame(frame);
     if (layer) { map.removeLayer(layer); layer = null; }
     if (!map.hasLayer(route)) { map.addLayer(route); }
   }
+  function ease(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
   function play() {
     reset();
     map.removeLayer(route);
     layer = L.layerGroup().addTo(map);
-    var i = 0;
-    (function step() {
-      if (i > 0) { L.polyline([coords[i - 1], coords[i]], legs[i]).addTo(layer); }
-      markers[i].addTo(layer);
-      i += 1;
-      timer = setTimeout(i < markers.length ? step : reset, i < markers.length ? stepMs : 1500);
-    })();
+    markers[0].addTo(layer);
+    var car = L.marker(legs[0].points[0], { icon: carIcon, interactive: false, zIndexOffset: 1000 });
+    car.addTo(layer);
+    var leg = 0;
+    function drive() {
+      if (leg >= legs.length) { timer = setTimeout(reset, 1500); return; }
+      var pts = legs[leg].points;
+      var line = L.polyline([pts[0]], legs[leg].style).addTo(layer);
+      var start = null;
+      function step(t) {
+        if (start === null) { start = t; }
+        var p = legMs ? Math.min(1, (t - start) / legMs) : 1;
+        var at = ease(p) * (pts.length - 1), i = Math.floor(at), f = at - i;
+        var a = pts[i], b = pts[Math.min(i + 1, pts.length - 1)];
+        var pos = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+        line.setLatLngs(pts.slice(0, i + 1).concat([pos]));
+        car.setLatLng(pos);
+        var body = car.getElement() && car.getElement().querySelector(".tv-car i");
+        // 아이콘은 오른쪽을 본다. 서쪽으로 갈 때만 뒤집는다.
+        if (body && b[1] !== a[1]) { body.style.transform = b[1] < a[1] ? "scaleX(-1)" : ""; }
+        if (p < 1) { frame = requestAnimationFrame(step); return; }
+        leg += 1;
+        markers[leg].addTo(layer);
+        timer = setTimeout(drive, pauseMs);
+      }
+      frame = requestAnimationFrame(step);
+    }
+    timer = setTimeout(drive, pauseMs);
   }
   var Button = L.Control.extend({
     options: { position: "topright" },
@@ -149,10 +181,12 @@ class _Replay(MacroElement):
         self._name = "Replay"
         self.route = route
         self.marker_names = ", ".join(m.get_name() for m in markers)
-        self.coords = json.dumps([[s.lat, s.lng] for s in stops])
-        legs = [None] + [_leg_style(a, b) for a, b in pairwise(stops)]
+        legs = [
+            {"points": _leg_points(a, b), "style": _leg_style(a, b)} for a, b in pairwise(stops)
+        ]
         self.legs = json.dumps(legs)
-        self.step_ms = REPLAY_STEP_MS
+        self.leg_ms = REPLAY_LEG_MS
+        self.pause_ms = REPLAY_PAUSE_MS
         self.label = REPLAY_LABEL
 
 
@@ -179,25 +213,37 @@ def _leg_style(a: Stop, b: Stop) -> dict:
     return {"color": day_color(b.day), "weight": 4}
 
 
+def _leg_points(a: Stop, b: Stop) -> list[list[float]]:
+    return [[lat, lng] for lat, lng in curve_points((a.lat, a.lng), (b.lat, b.lng))]
+
+
 def build_route_map(stops: list[Stop]) -> folium.Map:
-    """시간순 결제를 날짜별 색 경로로 그린다. 같은 날은 움직이는 선, 날짜가 바뀌면 회색 점선."""
+    """시간순 결제를 날짜별 색 곡선으로 잇는다. 같은 날은 움직이는 선, 날짜가 바뀌면 회색 점선."""
     m = folium.Map(location=[stops[0].lat, stops[0].lng], zoom_start=13, tiles="OpenStreetMap")
     route = folium.FeatureGroup(name="route", control=False).add_to(m)
     markers = [_marker(s).add_to(route) for s in stops]
+    # 같은 날 이어진 구간은 하나의 선으로 모아 그린다. 날짜가 바뀌면 지금까지 모은 선을 끝낸다.
+    run: list[list[float]] = []
     for a, b in pairwise(stops):
+        points = _leg_points(a, b)
         if a.day != b.day:
-            folium.PolyLine([[a.lat, a.lng], [b.lat, b.lng]], **DAY_JUMP_STYLE).add_to(route)
-    for day in dict.fromkeys(s.day for s in stops):
-        same_day = [[s.lat, s.lng] for s in stops if s.day == day]
-        if len(same_day) > 1:
-            color = day_color(day)
-            AntPath(same_day, color=color, pulse_color="#FFFFFF", weight=4, delay=1200).add_to(
-                route
-            )
+            _add_day_path(route, run, a.day)
+            run = []
+            folium.PolyLine(points, **DAY_JUMP_STYLE).add_to(route)
+        else:
+            run = run + points[1:] if run else points
+    _add_day_path(route, run, stops[-1].day)
     if len(stops) > 1:
         m.fit_bounds([[s.lat, s.lng] for s in stops], padding=(30, 30))
         _Replay(route, markers, stops).add_to(m)
     return m
+
+
+def _add_day_path(route: folium.FeatureGroup, points: list[list[float]], day: int) -> None:
+    if len(points) > 1:
+        AntPath(points, color=day_color(day), pulse_color="#FFFFFF", weight=4, delay=1200).add_to(
+            route
+        )
 
 
 def _marker(stop: Stop) -> folium.Marker:

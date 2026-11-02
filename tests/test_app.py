@@ -904,3 +904,20 @@ def test_story_bar_uses_its_own_shades_not_day_colors():
     text = story_html(stats, None)
     assert map_view.SHARE_COLORS[0] in text and map_view.SHARE_COLORS[1] in text
     assert not any(color in text for color in map_view.DAY_COLORS[1:])
+
+
+def test_route_is_drawn_as_curves_not_straight_lines():
+    m = build_route_map([stop("흑돼지", 0), stop("카페", 0, 33.5, 126.5)])
+    paths = [c for c in m._children.values() if hasattr(c, "_children")]
+    ant = [
+        child
+        for group in paths
+        for child in group._children.values()
+        if type(child).__name__ == "AntPath"
+    ]
+    assert ant and len(ant[0].locations) > 2
+
+
+def test_replay_moves_a_car_along_the_route():
+    html = build_route_map([stop("흑돼지", 0), stop("카페", 0, 33.5, 126.5)]).get_root().render()
+    assert "fa-car-side" in html and "requestAnimationFrame" in html
