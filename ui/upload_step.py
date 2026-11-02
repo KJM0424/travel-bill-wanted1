@@ -19,6 +19,8 @@ DATA_NOTICE = (
     "카드번호와 이름은 가리고 올려 주세요."
 )
 LOCAL_DATA_NOTICE = "사진은 이 컴퓨터의 AI 모델로 읽어요. 외부로 보내지 않아요."
+MOCK_DATA_NOTICE = "체험 모드라 AI를 부르지 않고, 미리 준비한 결과로 보여 줘요."
+NOTICES = {"ollama": LOCAL_DATA_NOTICE, "mock": MOCK_DATA_NOTICE}
 
 
 def process_uploads(
@@ -59,7 +61,7 @@ def process_uploads(
 
 def render_upload() -> None:
     st.header("영수증 사진을 올려 주세요", anchor=False)
-    st.caption(LOCAL_DATA_NOTICE if state.recognizer_name() == "ollama" else DATA_NOTICE)
+    st.caption(NOTICES.get(state.recognizer_name(), DATA_NOTICE))
     has_expenses = bool(state.get_trip().expenses)
     # key를 붙인 컨테이너로 감싸야 업로드 칸 CSS(ui/layout.py)가 이 화면에만 적용된다.
     with st.container(key="upload_box"), st.form("upload_form", clear_on_submit=True, border=False):
