@@ -54,6 +54,14 @@ class Expense(BaseModel):
 
 
 class PayoutInfo(BaseModel):
+    """돈을 받을 방법. 계좌는 은행·계좌번호·예금주로 나눠 받아 은행과 번호만 따로 복사할 수 있게 한다.
+
+    bank_account는 한 칸에 적던 예전 형식이다. 예전에 저장한 파일을 불러올 때만 쓴다.
+    """
+
+    bank: str | None = None
+    account_number: str | None = None
+    account_holder: str | None = None
     bank_account: str | None = None
     toss_link: str | None = None
     kakaopay_link: str | None = None

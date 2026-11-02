@@ -921,3 +921,78 @@ def test_route_is_drawn_as_curves_not_straight_lines():
 def test_replay_moves_a_car_along_the_route():
     html = build_route_map([stop("흑돼지", 0), stop("카페", 0, 33.5, 126.5)]).get_root().render()
     assert "fa-car-side" in html and "requestAnimationFrame" in html
+
+
+# --- 총무 계좌 ---
+
+
+def pay_key(name: str, field: str) -> str:
+    return f"setup_pay_{name}_{field}"
+
+
+def test_setup_saves_leader_bank_and_number(monkeypatch):
+    at = open_app(monkeypatch)
+    fill_setup(at, members="민수, 지영")
+    at.selectbox(key=pay_key("민수", "bank")).set_value("카카오뱅크").run()
+    at.text_input(key=pay_key("민수", "account_number")).input("3333 01 1234567").run()
+    at.text_input(key=pay_key("민수", "account_holder")).input("김민수").run()
+    at.button(key="setup_save").click().run()
+    info = at.session_state["trip"].payout["민수"]
+    assert (info.bank, info.account_number, info.account_holder) == (
+        "카카오뱅크",
+        "3333011234567",
+        "김민수",
+    )
+
+
+def test_setup_rejects_bad_account_number(monkeypatch):
+    from core.payment_message import ACCOUNT_NUMBER_ERROR
+
+    at = open_app(monkeypatch)
+    fill_setup(at, members="민수, 지영")
+    at.selectbox(key=pay_key("민수", "bank")).set_value("카카오뱅크").run()
+    at.text_input(key=pay_key("민수", "account_number")).input("12ab").run()
+    at.button(key="setup_save").click().run()
+    assert any(f"민수: {ACCOUNT_NUMBER_ERROR}" == e.value for e in at.error)
+    assert at.session_state["step"] == "설정"
+
+
+def test_setup_needs_both_bank_and_number(monkeypatch):
+    at = open_app(monkeypatch)
+    fill_setup(at, members="민수, 지영")
+    at.text_input(key=pay_key("지영", "account_number")).input("110123456789").run()
+    at.button(key="setup_save").click().run()
+    assert any("지영: 은행과 계좌번호를 함께 적어 주세요." == e.value for e in at.error)
+
+
+def test_old_one_line_account_is_split_into_fields(monkeypatch):
+    from core.schema import PayoutInfo
+
+    monkeypatch.setenv("RECOGNIZER", "mock")
+    monkeypatch.setenv("APP_PASSWORD", "")
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    old = PayoutInfo(bank_account="신한 110-123-456789 홍길동")
+    at.session_state["trip"] = trip_with([]).model_copy(update={"payout": {"A": old}})
+    at.session_state["step"] = "설정"
+    at.run()
+    assert at.selectbox(key=pay_key("A", "bank")).value == "신한은행"
+    assert at.text_input(key=pay_key("A", "account_number")).value == "110-123-456789"
+    assert at.text_input(key=pay_key("A", "account_holder")).value == "홍길동"
+
+
+def test_transfer_has_account_copy_when_receiver_has_account():
+    from core.payment_message import build_message
+    from core.schema import PayoutInfo
+    from core.settlement import Transfer
+    from ui.result_step import transfer_copies
+
+    trip = trip_with([]).model_copy(
+        update={"payout": {"A": PayoutInfo(bank="카카오뱅크", account_number="3333011234567")}}
+    )
+    copies = transfer_copies(Transfer("B", "A", 1000), trip)
+    assert [label for label, _ in copies] == ["메시지 복사", "계좌 복사"]
+    assert copies[1][1] == "카카오뱅크 3333011234567"
+    assert build_message(Transfer("B", "A", 1000), trip) in copies[0][1]
+    assert [label for label, _ in transfer_copies(Transfer("A", "B", 1000), trip)] == [
+        "메시지 복사"
+    ]

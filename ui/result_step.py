@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 from pydantic import ValidationError
 
-from core.payment_message import build_message, format_won
+from core.payment_message import account_copy_text, build_message, format_won, payout_owner
 from core.schema import FUND_WALLET, Trip
 from core.settlement import Balance, Transfer, compute_balances, plan_transfers, readiness_errors
 from ui.branding import APP_NAME
@@ -167,6 +167,15 @@ def copy_text(transfer: Transfer, trip: Trip) -> str:
     return f"[{APP_NAME}]\n{build_message(transfer, trip)}"
 
 
+def transfer_copies(transfer: Transfer, trip: Trip) -> list[tuple[str, str]]:
+    """송금 카드의 복사 버튼들: (버튼 이름, 복사할 글). 받는 사람 계좌가 있으면 계좌 복사를 더한다."""
+    copies = [("메시지 복사", copy_text(transfer, trip))]
+    account = account_copy_text(trip.payout.get(payout_owner(transfer, trip)))
+    if account:
+        copies.append(("계좌 복사", account))
+    return copies
+
+
 def _render_transfers(transfers: list[Transfer], trip: Trip) -> None:
     st.subheader("보낼 돈", anchor=False)
     if not transfers:
@@ -192,6 +201,8 @@ def _render_transfers(transfers: list[Transfer], trip: Trip) -> None:
                         width="content",
                     )
                     st.markdown(f"### {amount}", anchors=False, width="content")
-                text = copy_text(transfer, trip)
-                st.code(text, language=None, wrap_lines=True)
-                copy_button(text, key=f"copy_{number}")
+                copies = transfer_copies(transfer, trip)
+                st.code(copies[0][1], language=None, wrap_lines=True)
+                with st.container(horizontal=True):
+                    for index, (label, text) in enumerate(copies):
+                        copy_button(text, key=f"copy_{number}_{index}", label=label)
