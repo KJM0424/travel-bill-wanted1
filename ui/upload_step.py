@@ -10,7 +10,7 @@ from core.recognizer import RecognitionError
 from ui import state
 from ui.layout import bottom_button
 
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 # 업로더에서 형식을 막으면 Streamlit 영어 툴팁만 보이므로, 받은 뒤 직접 걸러 한국어로 안내한다.
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".heic")
 NOT_IMAGE_NOTICE = "{name}: 이미지 파일만 올릴 수 있어요 (JPG·PNG·HEIC)"

@@ -1,10 +1,13 @@
 """테스트셋으로 인식 정확도를 잰다.
 
-사용법: python -m eval.run_eval --prompt v1 [--recognizer gemini|mock] [--limit N]
+사용법: python -m eval.run_eval --prompt v1 [--recognizer gemini|ollama|mock]
+       [--source synthetic|real] [--interval 초] [--limit N]
 """
 
 import argparse
 import json
+import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -20,17 +23,34 @@ RESULTS_DIR = EVAL_DIR / "results"
 
 
 def evaluate(
-    entries: list[dict], recognizer: Recognizer, prompt_version: str, images_dir: Path
+    entries: list[dict],
+    recognizer: Recognizer,
+    prompt_version: str,
+    images_dir: Path,
+    interval: float = 0,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> list[dict]:
-    """라벨 항목마다 인식하고 채점한 행을 입력 순서대로 돌려준다. 캐시는 쓰지 않는다."""
+    """라벨 항목마다 인식하고 채점한 행을 입력 순서대로 돌려준다. 캐시는 쓰지 않는다.
+
+    interval이 0보다 크면 한 장씩, 그 초만큼 쉬며 부른다(무료 등급의 분당 호출 한도 대비).
+    """
     outcomes = {}
     present = [e for e in entries if (images_dir / e["file"]).exists()]
-    for start in range(0, len(present), MAX_FILES):
-        chunk = present[start : start + MAX_FILES]
+    size = 1 if interval > 0 else MAX_FILES
+    for start in range(0, len(present), size):
+        if start and interval > 0:
+            sleep(interval)
+        chunk = present[start : start + size]
         files = [(e["file"], (images_dir / e["file"]).read_bytes()) for e in chunk]
         for outcome in recognize_batch(files, recognizer, prompt_version, cache={}):
             outcomes[outcome.filename] = outcome
     return [_score_row(entry, outcomes.get(entry["file"])) for entry in entries]
+
+
+def select_entries(entries: list[dict], source: str | None, limit: int | None) -> list[dict]:
+    """출처(real·synthetic)로 거른 뒤 앞에서부터 limit건."""
+    chosen = [e for e in entries if source is None or e["source"] == source]
+    return chosen[:limit]
 
 
 def _score_row(entry: dict, outcome) -> dict:
@@ -95,14 +115,19 @@ def main() -> None:
     parser.add_argument("--prompt", required=True, help="프롬프트 버전 (예: v1)")
     parser.add_argument("--recognizer", choices=["gemini", "ollama", "mock"], default="gemini")
     parser.add_argument("--limit", type=int, help="앞에서부터 N건만 평가")
+    parser.add_argument("--source", choices=["real", "synthetic"], help="이 출처만 평가")
+    parser.add_argument(
+        "--interval", type=float, default=0, help="한 장씩 이 초만큼 쉬며 부른다(호출 한도 대비)"
+    )
     args = parser.parse_args()
 
     try:
         recognizer = _make_recognizer(args.recognizer)
     except RecognitionError as e:
         raise SystemExit(str(e)) from None
-    entries = json.loads(GROUND_TRUTH_PATH.read_text(encoding="utf-8"))[: args.limit]
-    rows = evaluate(entries, recognizer, args.prompt, IMAGES_DIR)
+    entries = json.loads(GROUND_TRUTH_PATH.read_text(encoding="utf-8"))
+    entries = select_entries(entries, args.source, args.limit)
+    rows = evaluate(entries, recognizer, args.prompt, IMAGES_DIR, interval=args.interval)
     # 같은 프롬프트로 인식기만 바꿔 비교하므로 결과 파일 이름에 인식기를 남긴다.
     stamp = f"{datetime.now().strftime('%Y%m%d-%H%M')}_{args.recognizer}"
     raw_path, csv_path = save_results(rows, args.prompt, RESULTS_DIR, stamp)

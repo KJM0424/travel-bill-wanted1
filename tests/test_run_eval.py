@@ -57,3 +57,29 @@ def test_make_recognizer_supports_ollama(monkeypatch):
     monkeypatch.setenv("OLLAMA_MODEL", "qwen3-vl:8b")
     recognizer = _make_recognizer("ollama")
     assert isinstance(recognizer, OllamaRecognizer) and recognizer.model == "qwen3-vl:8b"
+
+
+def test_interval_recognizes_one_at_a_time_with_pauses(tmp_path):
+    # 무료 등급은 분당 호출 수가 적어, 간격 없이 부르면 429로 실패했다.
+    (tmp_path / "synthetic").mkdir()
+    for i in range(3):
+        (tmp_path / "synthetic" / f"s{i}.png").write_bytes(png((i, 0, 0)))
+    pauses: list[float] = []
+    rows = evaluate(
+        [entry(f"synthetic/s{i}.png") for i in range(3)],
+        MockRecognizer(),
+        "v1",
+        tmp_path,
+        interval=12.0,
+        sleep=pauses.append,
+    )
+    assert len(rows) == 3 and all(r["error"] is None for r in rows)
+    assert pauses == [12.0, 12.0]
+
+
+def test_select_entries_by_source():
+    from eval.run_eval import select_entries
+
+    entries = [entry("real/r01.jpg", "real"), entry("synthetic/s01.png")]
+    assert [e["file"] for e in select_entries(entries, "synthetic", None)] == ["synthetic/s01.png"]
+    assert len(select_entries(entries, None, 1)) == 1
