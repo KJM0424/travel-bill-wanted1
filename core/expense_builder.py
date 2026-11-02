@@ -18,13 +18,19 @@ def build_expenses(
     existing_ids: 이미 있는 결제 건의 id. 업로드를 나눠 해도 id가 겹치지 않게 한다.
     """
     expenses: list[Expense] = []
-    notes: list[str] = []
+    # 실패 안내는 (이유, 파일 목록)으로 모았다가 마지막에 문장으로 바꾼다.
+    # 키 오류·하루 한도처럼 여러 장이 같은 이유로 실패하면 한 줄로 묶기 위해서다.
+    notes: list[str | tuple[str, list[str]]] = []
+    failures: dict[str, list[str]] = {}
     used_ids: set[str] = set(existing_ids)
     for outcome in outcomes:
         receipt = outcome.receipt
         if receipt is None:
             reason = outcome.error.rstrip(".") + "."
-            notes.append(f"{outcome.filename}: 읽지 못했어요. {reason} 직접 추가해 주세요.")
+            if reason not in failures:
+                failures[reason] = []
+                notes.append((reason, failures[reason]))
+            failures[reason].append(outcome.filename)
             continue
         if receipt.doc_type == "not_receipt":
             notes.append(f"{outcome.filename}: 영수증이 아니어서 제외했어요.")
@@ -36,7 +42,12 @@ def build_expenses(
             continue
         expense_id = _unique_id(outcome.image_hash[:12], used_ids)
         expenses.append(_to_expense(receipt, expense_id, outcome.image_hash, trip))
-    return expenses, notes
+    return expenses, [n if isinstance(n, str) else _failure_note(*n) for n in notes]
+
+
+def _failure_note(reason: str, filenames: list[str]) -> str:
+    who = filenames[0] if len(filenames) == 1 else f"{filenames[0]} 외 {len(filenames) - 1}장"
+    return f"{who}: 읽지 못했어요. {reason} 직접 추가할 수도 있어요."
 
 
 def _unique_id(base: str, used: set[str]) -> str:
