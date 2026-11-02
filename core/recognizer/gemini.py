@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from core.recognizer.base import RecognitionError, load_prompt
 from core.schema import Receipt
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.5-flash"
 HTTP_TIMEOUT_MS = 60_000
 # 잠시 기다리면 풀리는 오류: 호출 한도 초과(429), 서버 과부하(503)
 RETRY_MESSAGES = {
