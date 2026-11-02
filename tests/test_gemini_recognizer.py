@@ -141,3 +141,10 @@ def test_unknown_prompt_version_is_recognition_error():
     client = fake_client([ok_text(food_json)])
     with pytest.raises(RecognitionError, match="v999"):
         GeminiRecognizer("k", client=client, sleep=lambda s: None).recognize(b"img", "v999")
+
+
+def test_default_model_is_available_to_new_keys():
+    # 2026-11-02 확인: gemini-2.5-flash는 새 키에서 404(no longer available to new users)가 난다.
+    from core.recognizer.gemini import DEFAULT_MODEL
+
+    assert DEFAULT_MODEL == "gemini-3.5-flash"

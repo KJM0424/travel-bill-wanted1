@@ -28,7 +28,7 @@ RECOGNIZER=mock .venv/bin/streamlit run app.py
 | 이름 | 설명 |
 |---|---|
 | `GEMINI_API_KEY` | Gemini API 키. [Google AI Studio](https://aistudio.google.com/apikey)에서 발급한다 |
-| `GEMINI_MODEL` | 비우면 `gemini-2.5-flash` |
+| `GEMINI_MODEL` | 비우면 `gemini-3.5-flash` |
 | `RECOGNIZER` | `gemini` 또는 `mock`. 비우면 `gemini` |
 | `APP_PASSWORD` | 데모 비밀번호. 비우면 비밀번호 화면을 건너뛴다 |
 | `KAKAO_REST_API_KEY` | 경로 지도(다음 단계)용. [카카오 개발자](https://developers.kakao.com/)에서 발급한다. 지금 화면에서는 쓰지 않는다 |
@@ -53,7 +53,7 @@ RECOGNIZER=mock .venv/bin/streamlit run app.py
 4. **Advanced settings**에서 Python 3.12를 고르고, Secrets에 아래를 넣는다.
    ```toml
    GEMINI_API_KEY = "발급받은 키"
-   GEMINI_MODEL = "gemini-2.5-flash"
+   GEMINI_MODEL = "gemini-3.5-flash"
    APP_PASSWORD = "데모 비밀번호"
    RECOGNIZER = "gemini"
    ```
