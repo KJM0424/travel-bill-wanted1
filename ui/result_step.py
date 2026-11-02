@@ -10,6 +10,7 @@ from core.settlement import Balance, Transfer, compute_balances, plan_transfers,
 from ui.branding import APP_NAME
 from ui.copy_button import copy_button
 from ui.layout import bottom, bottom_button
+from ui.map_view import render_map
 from ui.review_step import expense_labels
 from ui.state import get_trip, go_to
 
@@ -58,6 +59,7 @@ def render_result() -> None:
     _render_transfers(plan_transfers(balances), trip)
     with st.expander("자세히 보기"):
         _render_table(balances, trip)
+    render_map(trip)
     bottom().download_button(
         "정산 파일 저장하기",
         export_trip(trip),
@@ -83,7 +85,7 @@ def _render_people(balances: list[Balance], trip: Trip) -> None:
         ):
             with st.container(width="content", gap=None):
                 st.markdown(f"**{name}**")
-                st.caption(f"낸 돈 {format_won(b.paid)}, 쓴 돈 {format_won(b.owed)}")
+                st.caption(f"낸 돈 {format_won(b.paid)}, 내 몫 {format_won(b.owed)}")
             with st.container(width="content", gap=None, horizontal_alignment="right"):
                 if b.net > 0:
                     st.caption("받을 돈")
@@ -107,7 +109,7 @@ def _net_color(net: int) -> str:
 
 
 def _render_table(balances: list[Balance], trip: Trip) -> None:
-    rows = [{"이름": b.name, "낸 돈": b.paid, "쓴 돈": b.owed, "차액": b.net} for b in balances]
+    rows = [{"이름": b.name, "낸 돈": b.paid, "내 몫": b.owed, "차액": b.net} for b in balances]
     # 숫자 칸으로 두어 오른쪽 정렬된다.
     styled = (
         pd.DataFrame(rows)
@@ -119,9 +121,9 @@ def _render_table(balances: list[Balance], trip: Trip) -> None:
         hide_index=True,
         column_config={
             "낸 돈": st.column_config.NumberColumn(format="%,d원"),
-            "쓴 돈": st.column_config.NumberColumn(format="%,d원"),
+            "내 몫": st.column_config.NumberColumn(format="%,d원"),
         },
-        alt=f"{trip.name} 사람별 낸 돈, 쓴 돈, 차액",
+        alt=f"{trip.name} 사람별 낸 돈, 내 몫, 차액",
     )
     st.caption("차액이 +면 받을 돈, -면 보낼 돈이에요.")
 

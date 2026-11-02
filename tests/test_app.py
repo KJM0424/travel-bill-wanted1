@@ -6,9 +6,11 @@ from PIL import Image
 from streamlit.testing.v1 import AppTest
 
 from core.expense_builder import sort_expenses
-from core.schema import FUND_WALLET
+from core.geocode import GeoResult
+from core.schema import FUND_WALLET, Expense
 from tests.ui_helpers import APP_PATH, exp, fill_setup, open_app, open_app_with_trip, trip_with
-from ui import state
+from ui import map_view, state
+from ui.map_view import build_route_map
 from ui.result_step import export_trip, import_trip
 from ui.review_step import add_manual_expense, expense_labels
 from ui.setup_step import load_trip_file
@@ -532,8 +534,126 @@ def test_result_shows_person_cards(monkeypatch):
     assert "받을 돈" in texts and "보낼 돈" in texts and "20,000원" in texts
 
 
+def test_result_person_card_says_my_share(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
+    captions = [c.value for c in at.caption]
+    assert "낸 돈 30,000원, 내 몫 10,000원" in captions
+    assert not any("쓴 돈" in c for c in captions)
+
+
 def test_transfer_message_starts_with_app_name(monkeypatch):
     from ui.branding import APP_NAME
 
     at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
     assert at.code and all(c.value.splitlines()[0] == f"[{APP_NAME}]" for c in at.code)
+
+
+# --- 경로 지도 (Task 18) ---
+
+
+def place(id: str, merchant: str, hour: int, address: str | None = None, **kwargs) -> Expense:
+    return Expense(
+        expense_id=id,
+        source="ai",
+        merchant_name=merchant,
+        merchant_address=address,
+        paid_at=datetime(2026, 10, 10, hour),
+        time_known=True,
+        amount=10000,
+        payer="A",
+        participants=["A", "B"],
+        **kwargs,
+    )
+
+
+class FakeGeocoder:
+    """geocode_trip 대신 고정 결과를 돌려주고, 무엇을 물었는지 기록한다."""
+
+    def __init__(self, results: dict[str, GeoResult]):
+        self.results = results
+        self.asked: list[list[str]] = []
+        self.known: list[dict] = []
+
+    def __call__(self, expenses, api_key, session=None, known=None):
+        known = known or {}
+        self.asked.append([e.expense_id for e in expenses if e.expense_id not in known])
+        self.known.append(dict(known))
+        return {
+            e.expense_id: GeoResult(known[e.expense_id])
+            if e.expense_id in known
+            else self.results[e.expense_id]
+            for e in expenses
+            if map_view.is_mappable(e)
+        }
+
+
+def open_map(monkeypatch, expenses: list[Expense], results: dict[str, GeoResult], key: str = "k"):
+    fake = FakeGeocoder(results)
+    monkeypatch.setattr(map_view, "geocode_trip", fake)
+    monkeypatch.setattr(map_view, "kakao_api_key", lambda: key)
+    return open_app_with_trip(monkeypatch, expenses=expenses, step="정산"), fake
+
+
+def all_text(at: AppTest) -> str:
+    elements = [*at.markdown, *at.caption, *at.info, *at.warning, *at.subheader]
+    return " ".join(e.value for e in elements)
+
+
+def test_route_map_has_antpath_and_numbered_markers():
+    m = build_route_map([("흑돼지", 33.4, 126.3), ("카페", 33.5, 126.5)])
+    html = m.get_root().render()
+    assert "antPath" in html and "1. 흑돼지" in html and "2. 카페" in html
+    assert "#17654C" in html
+
+
+def test_render_map_without_key_shows_info(monkeypatch):
+    at, fake = open_map(monkeypatch, [place("e1", "흑돼지", 12)], {}, key="")
+    assert any("카카오" in i.value for i in at.info)
+    assert fake.asked == []
+
+
+def test_render_map_lists_not_found_expenses(monkeypatch):
+    expenses = [place("e1", "흑돼지", 12), place("e2", "없는가게", 15)]
+    results = {"e1": GeoResult((33.4, 126.3)), "e2": GeoResult(None)}
+    at, _ = open_map(monkeypatch, expenses, results)
+    assert "위치를 찾지 못한 결제: 없는가게" in all_text(at)
+    assert "위치를 불러오지 못했어요" not in all_text(at)
+
+
+def test_render_map_all_lookups_failed_shows_load_error(monkeypatch):
+    expenses = [place("e1", "흑돼지", 12), place("e2", "카페", 15)]
+    results = {"e1": GeoResult(None, failed=True), "e2": GeoResult(None, failed=True)}
+    at, _ = open_map(monkeypatch, expenses, results)
+    assert any("위치를 불러오지 못했어요" in w.value for w in at.warning)
+    assert "위치를 찾지 못한 결제" not in all_text(at)
+
+
+def test_render_map_caches_found_coords_only(monkeypatch):
+    expenses = [place("e1", "흑돼지", 12), place("e2", "없는가게", 15)]
+    results = {"e1": GeoResult((33.4, 126.3)), "e2": GeoResult(None)}
+    at, fake = open_map(monkeypatch, expenses, results)
+    cache = at.session_state["geo_cache"]
+    assert set(cache) == {"e1"}
+    at.run()
+    # 찾은 건은 다시 묻지 않고 기준 지점으로만 넘기고, 못 찾은 건은 다시 묻는다.
+    assert fake.asked[-1] == ["e2"] and fake.known[-1] == {"e1": (33.4, 126.3)}
+
+
+def test_render_map_requeries_when_address_changes(monkeypatch):
+    at, fake = open_map(monkeypatch, [place("e1", "흑돼지", 12)], {"e1": GeoResult((33.4, 126.3))})
+    trip = at.session_state["trip"]
+    moved = trip.expenses[0].model_copy(update={"merchant_address": "제주 서귀포시 1"})
+    at.session_state["trip"] = trip.model_copy(update={"expenses": [moved]})
+    at.run()
+    assert fake.asked[-1] == ["e1"]
+
+
+def test_render_map_skips_transport_and_manual(monkeypatch):
+    expenses = [
+        place("e1", "흑돼지", 12),
+        place("taxi", "택시", 13, category="transport"),
+        exp(5000, "A", ["A"], id="m1", merchant="직접 쓴 돈"),
+    ]
+    at, fake = open_map(monkeypatch, expenses, {"e1": GeoResult((33.4, 126.3))})
+    assert fake.asked == [["e1"]]
+    assert "택시" not in all_text(at) and "직접 쓴 돈" not in all_text(at)
