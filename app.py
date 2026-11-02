@@ -40,8 +40,8 @@ def check_password() -> bool:
 def render_step(step: str) -> None:
     step_header(step)
     if step != "설정" and get_trip() is None:
-        st.info("여행 설정을 먼저 저장해 주세요.")
-        bottom_button("여행 설정하러 가기", key="need_setup", on_click=go_to, args=("설정",))
+        st.info("여행 정보를 먼저 알려 주세요.")
+        bottom_button("여행 정보 입력하기", key="need_setup", on_click=go_to, args=("설정",))
         return
     render_flashes()
     RENDERERS[step]()

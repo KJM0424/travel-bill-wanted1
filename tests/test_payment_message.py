@@ -72,15 +72,15 @@ def test_message_only_lists_present_channels():
 def test_fund_wallet_receiver_uses_leader_payout():
     t = trip_with_payout("A", PayoutInfo(toss_link="https://toss.me/minsu"), mode="fund")
     msg = build_message(Transfer("B", FUND_WALLET, 7000), t)
-    assert "https://toss.me/minsu" in msg and "회비 지갑(대표 A)" in msg
+    assert "https://toss.me/minsu" in msg and "회비 지갑(총무 A)" in msg
 
 
 def test_fund_wallet_sender_is_refund_message():
     msg = build_message(
         Transfer(FUND_WALLET, "B", 7000), trip_with_payout("A", PayoutInfo(), mode="fund")
     )
-    assert "환급" in msg and "A" in msg
-    assert msg.splitlines()[0] == "[제주] 대표 A님이 B님께 회비 7,000원을 환급해요."
+    assert "돌려드려요" in msg and "A" in msg
+    assert msg.splitlines()[0] == "[제주] 총무 A님이 B님께 남은 회비 7,000원을 돌려드려요."
 
 
 # --- 은행·계좌번호를 나눠 받은 계좌 ---

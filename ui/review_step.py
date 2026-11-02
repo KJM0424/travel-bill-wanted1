@@ -239,7 +239,7 @@ def _render_editor(e: Expense, trip: Trip) -> dict:
             key=f"part_{eid}",
             help="함께하지 않은 사람은 눌러서 빼 주세요.",
         )
-        name = st.text_input("상호", key=f"rv_name_{eid}")
+        name = st.text_input("가게 이름", key=f"rv_name_{eid}")
         amount = st.number_input("금액 (원)", min_value=0, step=100, key=f"rv_amount_{eid}")
         with st.container(horizontal=True, vertical_alignment="bottom"):
             day = st.date_input("날짜", key=f"rv_date_{eid}")
@@ -286,7 +286,7 @@ def _init_editor_widgets(e: Expense) -> None:
 def _render_manual_form() -> None:
     with st.form("manual_form", clear_on_submit=True, border=False):
         name_col, amount_col = st.columns([3, 2])
-        merchant = name_col.text_input("상호·내용", key="manual_merchant", placeholder="주차비")
+        merchant = name_col.text_input("내용", key="manual_merchant", placeholder="주차비")
         amount = amount_col.number_input("금액 (원)", min_value=0, step=100, key="manual_amount")
         date_col, time_col = st.columns(2)
         day = date_col.date_input("날짜 (선택)", value=None, key="manual_date")
@@ -298,7 +298,7 @@ def _render_manual_form() -> None:
     if not submitted:
         return
     if not merchant.strip():
-        st.error("상호나 내용을 적어 주세요.")
+        st.error("무엇에 쓴 돈인지 적어 주세요.")
         return
     if amount <= 0:
         st.error("금액은 0원보다 커야 해요.")

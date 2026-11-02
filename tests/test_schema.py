@@ -29,7 +29,7 @@ def test_trip_rejects_bad_members(members):
 
 
 def test_trip_duplicate_member_message_is_korean():
-    with pytest.raises(ValidationError, match="참석자 이름이 중복돼요: 민수"):
+    with pytest.raises(ValidationError, match="같은 이름이 두 번 있어요: 민수"):
         make_trip(members=["민수", "민수"])
 
 

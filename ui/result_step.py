@@ -47,13 +47,13 @@ def labeled_trip(trip: Trip) -> Trip:
 
 def render_result() -> None:
     trip = get_trip()
-    # 참석자가 비었거나 여행 밖 이름이면 compute_balances가 예외를 내므로 먼저 막는다.
+    # 함께한 사람이 비었거나 여행 밖 이름이면 compute_balances가 예외를 내므로 먼저 막는다.
     errors = readiness_errors(labeled_trip(trip))
     if errors:
         st.header("정산 전에 고칠 게 있어요", anchor=False)
         for error in errors:
             st.error(error)
-        bottom_button("확인 화면으로 돌아가기", key="result_back", on_click=go_to, args=("검토",))
+        bottom_button("결제 내역으로 돌아가기", key="result_back", on_click=go_to, args=("검토",))
         return
 
     st.header("이렇게 나누면 돼요", anchor=False)
@@ -114,7 +114,7 @@ def summary_html(trip: Trip) -> str:
 def _render_people(balances: list[Balance], trip: Trip) -> None:
     """사람마다 카드 하나. 보낼 돈·받을 돈을 크게 보여 준다."""
     for b in balances:
-        name = f"{b.name} (대표 {trip.leader})" if b.name == FUND_WALLET else b.name
+        name = f"{b.name} (총무 {trip.leader})" if b.name == FUND_WALLET else b.name
         with st.container(
             border=True,
             horizontal=True,
@@ -123,7 +123,7 @@ def _render_people(balances: list[Balance], trip: Trip) -> None:
         ):
             with st.container(width="content", gap=None):
                 st.markdown(f"**{name}**")
-                st.caption(f"낸 돈 {format_won(b.paid)}, 내 몫 {format_won(b.owed)}")
+                st.caption(f"낸 돈 {format_won(b.paid)}, 나눌 몫 {format_won(b.owed)}")
             with st.container(width="content", gap=None, horizontal_alignment="right"):
                 if b.net > 0:
                     st.caption("받을 돈")
@@ -132,7 +132,7 @@ def _render_people(balances: list[Balance], trip: Trip) -> None:
                     st.caption("보낼 돈")
                     st.markdown(f"### {format_won(-b.net)}", anchors=False)
                 else:
-                    st.caption("주고받을 돈 없어요")
+                    st.caption("주고받을 돈이 없어요")
     if trip.mode == "fund":
         st.caption(f"회비형이라 낸 돈에 1인 회비 {format_won(trip.fund_per_person)}이 들어 있어요.")
 
@@ -147,7 +147,7 @@ def _net_color(net: int) -> str:
 
 
 def _render_table(balances: list[Balance], trip: Trip) -> None:
-    rows = [{"이름": b.name, "낸 돈": b.paid, "내 몫": b.owed, "차액": b.net} for b in balances]
+    rows = [{"이름": b.name, "낸 돈": b.paid, "나눌 몫": b.owed, "차액": b.net} for b in balances]
     # 숫자 칸으로 두어 오른쪽 정렬된다.
     styled = (
         pd.DataFrame(rows)
@@ -159,15 +159,15 @@ def _render_table(balances: list[Balance], trip: Trip) -> None:
         hide_index=True,
         column_config={
             "낸 돈": st.column_config.NumberColumn(format="%,d원"),
-            "내 몫": st.column_config.NumberColumn(format="%,d원"),
+            "나눌 몫": st.column_config.NumberColumn(format="%,d원"),
         },
-        alt=f"{trip.name} 사람별 낸 돈, 내 몫, 차액",
+        alt=f"{trip.name} 사람별 낸 돈, 나눌 몫, 차액",
     )
     st.caption("차액이 +면 받을 돈, -면 보낼 돈이에요.")
 
 
 def _is_leader_wallet(transfer: Transfer, trip: Trip) -> bool:
-    """회비형에서 대표와 회비 지갑 사이 송금. 대표가 지갑을 들고 있어 자기 자신에게 보내는 꼴이다."""
+    """회비형에서 총무와 회비 지갑 사이 송금. 총무가 지갑을 들고 있어 자기 자신에게 보내는 꼴이다."""
     return trip.mode == "fund" and {transfer.sender, transfer.receiver} == {
         trip.leader,
         FUND_WALLET,
@@ -196,9 +196,11 @@ def _render_transfers(transfers: list[Transfer], trip: Trip) -> None:
     for number, transfer in enumerate(transfers):
         amount = format_won(transfer.amount)
         if _is_leader_wallet(transfer, trip) and transfer.sender == trip.leader:
-            st.info(f"대표가 직접 채울 금액: {amount} (대표 {trip.leader}님이 회비 지갑에 보태요)")
+            st.info(f"회비가 {amount} 모자라요. 총무 {trip.leader}님이 채워 주세요.")
         elif _is_leader_wallet(transfer, trip):
-            st.info(f"대표 몫 환급: 대표 {trip.leader}님이 회비 지갑에서 {amount}을 가져가요")
+            st.info(
+                f"회비가 남았어요. 총무 {trip.leader}님 몫 {amount}은 남은 회비에서 가져가면 돼요."
+            )
         else:
             with st.container(border=True):
                 with st.container(

@@ -14,7 +14,10 @@ PROMPT_VERSION = "v1"
 # 업로더에서 형식을 막으면 Streamlit 영어 툴팁만 보이므로, 받은 뒤 직접 걸러 한국어로 안내한다.
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".heic")
 NOT_IMAGE_NOTICE = "{name}: 이미지 파일만 올릴 수 있어요 (JPG·PNG·HEIC)"
-DATA_NOTICE = "사진은 Google Gemini로 읽고 저장하지 않아요. 카드번호와 이름은 가리고 올려 주세요."
+DATA_NOTICE = (
+    "사진은 Google Gemini로 보내 읽어요. 이 앱은 사진을 저장하지 않아요. "
+    "카드번호와 이름은 가리고 올려 주세요."
+)
 LOCAL_DATA_NOTICE = "사진은 이 컴퓨터의 AI 모델로 읽어요. 외부로 보내지 않아요."
 
 
@@ -111,7 +114,8 @@ def _render_outcome() -> None:
         # 파일마다 상자를 띄우면 화면이 안내로 덮이므로 한 상자에 모은다.
         st.warning(
             "\n".join(f"- {n}" for n in per_file),
-            title=f"{len(per_file)}장은 결제로 넣지 않았어요",
+            # 같은 이유의 실패는 "a.jpg 외 n장" 한 줄로 묶여 있어 줄 수가 장수가 아니다.
+            title="결제로 넣지 못한 사진이 있어요",
         )
     for notice in notices:
         if notice not in per_file:

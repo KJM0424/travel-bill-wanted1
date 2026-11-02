@@ -22,14 +22,14 @@ UPLOAD_OUTCOME_KEYS = ("upload_notices", "upload_error", "upload_added")
 
 FIELD_LABELS = {
     "name": "여행 이름",
-    "members": "참석자",
-    "leader": "대표",
+    "members": "함께한 사람",
+    "leader": "총무",
     "mode": "정산 방식",
     "fund_per_person": "1인 회비",
-    "start_date": "시작일",
-    "end_date": "종료일",
-    "payout": "송금 정보",
-    "expenses": "결제 건",
+    "start_date": "가는 날",
+    "end_date": "오는 날",
+    "payout": "계좌·송금 링크",
+    "expenses": "결제",
 }
 
 

@@ -91,7 +91,7 @@ def test_missing_model_tells_how_to_pull():
 
 def test_other_http_error_is_reported():
     session = FakeSession([error_reply(500, "boom")])
-    with pytest.raises(RecognitionError, match="로컬 AI 호출 실패: HTTP 500"):
+    with pytest.raises(RecognitionError, match=r"로컬 AI에서 오류가 났어요\(HTTP 500\)"):
         OllamaRecognizer(session=session).recognize(b"img", "v1")
 
 

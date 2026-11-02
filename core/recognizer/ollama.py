@@ -63,9 +63,11 @@ class OllamaRecognizer:
             raise RecognitionError("로컬 AI가 시간 안에 응답하지 않았어요.") from None
         if response.status_code == 404:
             raise RecognitionError(
-                f"로컬 AI 모델 '{self.model}'이 없어요. 터미널에서 "
+                f"로컬 AI 모델이 없어요: {self.model}. 터미널에서 "
                 f"'ollama pull {self.model}'로 받아 주세요."
             )
         if response.status_code != 200:
-            raise RecognitionError(f"로컬 AI 호출 실패: HTTP {response.status_code}")
+            raise RecognitionError(
+                f"로컬 AI에서 오류가 났어요(HTTP {response.status_code}). 잠시 뒤에 다시 올려 주세요."
+            )
         return response.json().get("message", {}).get("content") or ""

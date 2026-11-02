@@ -139,12 +139,12 @@ def test_plan_transfers_skips_zero_and_is_deterministic():
 def test_readiness_errors():  # Review Focus 5 + 빈 상태
     assert readiness_errors(trip("prepaid", [])) == ["결제 건이 없어요."]
     errs = readiness_errors(trip("prepaid", [exp(0, "A", ["A"]), exp(5000, "A", [])]))
-    assert any("금액" in e for e in errs) and any("참석자" in e for e in errs)
+    assert any("금액" in e for e in errs) and any("함께한 사람" in e for e in errs)
 
 
 def test_readiness_rejects_payer_outside_trip():
     errs = readiness_errors(trip("prepaid", [exp(5000, "D", ["A"])]))
-    assert errs == ["'가게5000' 결제자가 여행 참석자가 아니에요."]
+    assert errs == ["'가게5000' 결제한 사람이 이 여행에 없어요."]
 
 
 def test_readiness_allows_fund_wallet_payer_in_fund_mode():
@@ -160,9 +160,9 @@ def test_readiness_ignores_excluded():
 
 def test_readiness_rejects_participant_outside_trip():
     errs = readiness_errors(trip("prepaid", [exp(9000, "A", ["B", "D"])]))
-    assert errs == ["'가게9000' 참석자 중 여행 참석자가 아닌 사람이 있어요: D"]
+    assert errs == ["'가게9000' 함께한 사람 중 이 여행에 없는 사람이 있어요: D"]
 
 
 def test_readiness_rejects_fund_wallet_as_participant():
     errs = readiness_errors(trip("fund", [exp(9000, "A", [FUND_WALLET])], fee=1000))
-    assert errs == [f"'가게9000' 참석자 중 여행 참석자가 아닌 사람이 있어요: {FUND_WALLET}"]
+    assert errs == [f"'가게9000' 함께한 사람 중 이 여행에 없는 사람이 있어요: {FUND_WALLET}"]
