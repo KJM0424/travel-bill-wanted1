@@ -23,7 +23,8 @@ def build_expenses(
     for outcome in outcomes:
         receipt = outcome.receipt
         if receipt is None:
-            notes.append(f"{outcome.filename}: 인식 실패({outcome.error}). 직접 추가해 주세요.")
+            reason = outcome.error.rstrip(".") + "."
+            notes.append(f"{outcome.filename}: 읽지 못했어요. {reason} 직접 추가해 주세요.")
             continue
         if receipt.doc_type == "not_receipt":
             notes.append(f"{outcome.filename}: 영수증이 아니어서 제외했어요.")

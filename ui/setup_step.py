@@ -26,8 +26,8 @@ from ui.state import (
 MODE_LABELS = {"prepaid": "선결제형", "fund": "회비형"}
 MODE_BY_LABEL = {label: mode for mode, label in MODE_LABELS.items()}
 MODE_HELP = {
-    "prepaid": "각자 결제하고, 여행이 끝난 뒤 나눠요.",
-    "fund": "회비를 먼저 모아 그 돈으로 결제하고, 남거나 모자란 돈을 나눠요.",
+    "prepaid": "각자 결제하고 여행이 끝난 뒤 나눠요.",
+    "fund": "회비를 먼저 모아 쓰고, 남거나 모자란 돈을 나눠요.",
 }
 # 저장 버튼은 위젯 상태를 지우면 안 된다.
 SETUP_BUTTON_KEYS = ("setup_save",)
@@ -61,29 +61,33 @@ def load_trip_file(data: bytes) -> str | None:
 
 
 def render_setup() -> None:
-    st.header("누구와 여행했나요?", anchor=False)
+    st.header("어떤 여행이었나요?", anchor=False)
     trip = get_trip()
     _init_from_trip(trip)
 
     st.text_input("여행 이름", key="setup_name", placeholder="제주 2박 3일")
+    with st.container(horizontal=True):
+        st.date_input("가는 날", key="setup_start")
+        st.date_input("오는 날", key="setup_end")
+
+    st.space("small")
+    st.subheader("누구와 갔나요?", anchor=False)
     st.text_input(
         "함께한 사람",
         key="setup_members",
         placeholder="민수, 지영, 철수",
-        help="쉼표로 나눠 적어 주세요.",
+        help="쉼표로 나눠 적고 Enter를 눌러 주세요.",
     )
     names = list(dict.fromkeys(n for n in parse_members(session()["setup_members"]) if n))
     if session().get("setup_leader") not in names:
-        # 값을 지우기만 하면 서버는 첫 사람을 고르지만 화면에는 빈 칸이나 빠진 사람이 남는다.
+        # 값을 지우기만 하면 화면에는 빈 선택이나 빠진 사람이 남는다.
         session()["setup_leader"] = names[0] if names else None
-    st.selectbox(
-        "대표 (총무)", names, key="setup_leader", placeholder="함께한 사람을 먼저 적어 주세요"
-    )
+    if names:
+        st.pills("총무", names, key="setup_leader", help="돈을 모으거나 대신 낸 사람이에요.")
+    else:
+        st.caption("이름을 적으면 여기서 총무를 고를 수 있어요.")
 
-    start_col, end_col = st.columns(2)
-    start_col.date_input("시작일", key="setup_start")
-    end_col.date_input("종료일", key="setup_end")
-
+    st.space("small")
     st.segmented_control(
         "정산 방식", list(MODE_BY_LABEL), key="setup_mode", required=True, width="stretch"
     )
@@ -91,11 +95,11 @@ def render_setup() -> None:
     if session()["setup_mode"] == MODE_LABELS["fund"]:
         st.number_input("1인 회비 (원)", min_value=0, step=10000, key="setup_fee")
 
-    with st.expander("받을 계좌·송금 링크 (선택)", icon=":material/account_balance:"):
+    with st.expander("돈 받을 계좌·송금 링크 (선택)", icon=":material/account_balance:"):
         if not names:
             st.caption("함께한 사람을 먼저 적어 주세요.")
         else:
-            st.caption("돈을 받을 사람만 적으면 돼요. 송금 메시지에 함께 들어가요.")
+            st.caption("받을 사람만 적으면 송금 메시지에 함께 들어가요.")
         for name in names:
             st.markdown(f"**{name}**")
             for field, label in PAYOUT_FIELDS:
