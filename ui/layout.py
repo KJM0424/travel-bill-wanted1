@@ -6,19 +6,96 @@ from typing import Any
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
-from ui.state import START_STEP, STEP_LABELS, STEPS, go_to, recognizer_name, session
+from ui.state import START_STEP, STEPS, go_to, recognizer_name, session
 
 # 휴대폰 한 손 화면 폭. 데스크톱에서도 이 폭으로 가운데에 둔다.
 COLUMN_WIDTH = 480
-# 테마 설정으로 못 하는 두 가지만 CSS로 한다. 우리가 붙인 key 클래스만 건드린다.
-# - 좌우 여백: Streamlit 기본 1rem(15px)에 5px를 더해 20px로 맞춘다.
-# - 한글 줄바꿈: 낱말 중간에서 끊지 않는다("드려/요." 방지).
+# 테마 설정(.streamlit/config.toml)으로 못 하는 것만 CSS로 한다. 우리가 붙인 key 클래스만 건드린다.
+# 색은 config.toml과 같은 값이다: 글자 #191F28, 보조 글자 #6B7684, 선 #E5E8EB, 강조 #17654C.
 COLUMN_CSS = """
 <style>
 .st-key-page, .st-key-page_bottom { padding-left: 5px; padding-right: 5px; }
+/* 한글은 낱말 중간에서 끊지 않는다("드려/요." 방지). 숫자는 자릿수를 맞춰 금액을 비교하기 쉽게 한다. */
 .st-key-page p, .st-key-page li, .st-key-page h1, .st-key-page h2, .st-key-page h3 {
   word-break: keep-all;
 }
+.st-key-page { font-variant-numeric: tabular-nums; }
+.st-key-page h1 { letter-spacing: -0.02em; line-height: 1.3; }
+.st-key-page h2 { letter-spacing: -0.02em; }
+
+/* 검토 화면: 은행 앱 거래 내역처럼 줄로 나눈 목록 */
+[class*="st-key-row_"] { padding: 14px 0 12px; border-bottom: 1px solid #E5E8EB; }
+[class*="st-key-row_"] p { margin-bottom: 0; }
+[class*="st-key-ico_"] {
+  flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%;
+  background: #EEF5F1; color: #17654C; display: flex; align-items: center; justify-content: center;
+}
+[class*="st-key-ico_"] > div { width: auto !important; }
+[class*="st-key-ico_"] p { margin: 0; line-height: 1; font-size: 20px; }
+[class*="st-key-rt_"] { gap: 2px; }
+[class*="st-key-rt_"] [data-testid="stCaptionContainer"] { margin: 0; }
+/* 마크다운 기본 아래 여백(-1rem)이 다음 줄과 겹치게 해서 없앤다. */
+[class*="st-key-row_"] [data-testid="stMarkdownContainer"] { margin-bottom: 0; }
+/* 참석자 칩: 빠진 사람은 회색 취소선으로 바로 보이게 한다. */
+[class*="st-key-part_"] button[aria-pressed="false"] p {
+  color: #6B7684; text-decoration: line-through;
+}
+[class*="st-key-row_"] [data-testid="stBaseButton-tertiary"] p { color: #6B7684; font-size: 14px; }
+[class*="st-key-edit_"] {
+  background: #F7F8FA; border-radius: 14px; padding: 16px; margin-top: 8px;
+}
+[class*="st-key-day_head_"] { margin-top: 18px; }
+[class*="st-key-day_head_"] p { color: #6B7684; font-weight: 600; font-size: 14px; }
+
+/* 정산 화면: 영수증 한 장처럼 아래가 톱니 모양인 요약 */
+.tv-slip {
+  background: #F2F4F6; border-radius: 16px 16px 0 0; padding: 20px 20px 24px;
+  position: relative; margin-bottom: 14px;
+}
+.tv-slip::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -10px; height: 10px;
+  background: radial-gradient(circle at 10px 0, #F2F4F6 7px, transparent 7.5px) 0 0 / 20px 10px repeat-x;
+}
+.tv-slip .tv-label { color: #191F28; font-weight: 600; font-size: 15px; margin: 0; }
+.tv-slip .tv-label span { color: #6B7684; font-weight: 500; margin-left: 6px; }
+.tv-slip .tv-total { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin: 2px 0 14px; }
+.st-key-page .tv-slip dl {
+  display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0; padding: 0;
+  font-size: 15px;
+}
+.st-key-page .tv-slip dt, .st-key-page .tv-slip dd { margin: 0; padding: 0; }
+.tv-slip dt { color: #6B7684; }
+.tv-slip dd { margin: 0; text-align: right; font-weight: 600; }
+
+/* 업로드 칸: Streamlit 기본 영어 문구("Upload", "200MB per file")를 한국어로 바꾸고 칸을 크게 한다. */
+.st-key-upload_box [data-testid="stFileUploaderDropzone"] {
+  flex-direction: column; justify-content: center; align-items: center; gap: 8px;
+  min-height: 148px;
+  background: #F7F8FA; border: 1.5px dashed #C9D1D9; border-radius: 16px;
+}
+.st-key-upload_box [data-testid="stFileUploaderDropzone"] button p { font-size: 0; }
+.st-key-upload_box [data-testid="stFileUploaderDropzone"] button p::after {
+  content: "사진 고르기"; font-size: 15px;
+}
+.st-key-upload_box [data-testid="stFileUploaderDropzoneInstructions"] { margin: 0; }
+.st-key-upload_box [data-testid="stFileUploaderDropzoneInstructions"] span { font-size: 0; }
+.st-key-upload_box [data-testid="stFileUploaderDropzoneInstructions"] span::after {
+  content: "여러 장을 한 번에 골라도 돼요"; font-size: 14px; color: #6B7684;
+}
+
+/* 시작 화면: 세 단계 안내 */
+.st-key-page ol.tv-steps {
+  list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 18px;
+}
+.st-key-page ol.tv-steps li {
+  margin: 0; padding: 0; display: grid; grid-template-columns: 32px 1fr; gap: 14px;
+}
+.tv-steps .tv-num {
+  width: 32px; height: 32px; border-radius: 50%; background: #EEF5F1; color: #17654C;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px;
+}
+.tv-steps b { display: block; font-size: 17px; color: #191F28; }
+.tv-steps span { color: #6B7684; font-size: 15px; }
 </style>
 """
 
@@ -40,7 +117,7 @@ def demo_badge() -> None:
 
 
 def step_header(step: str) -> None:
-    """이전 버튼과 '2/4 영수증' 진행 표시."""
+    """앱 상단 막대: 왼쪽 이전 버튼, 오른쪽 '2/4' 단계 표시."""
     index = STEPS.index(step)
     previous = STEPS[index - 1] if index > 0 else START_STEP
     with st.container(
@@ -50,12 +127,13 @@ def step_header(step: str) -> None:
             "이전",
             key="nav_back",
             type="tertiary",
-            icon=":material/arrow_back:",
+            icon=":material/arrow_back_ios_new:",
             on_click=go_to,
             args=(previous,),
         )
-        demo_badge()
-    st.progress((index + 1) / len(STEPS), text=f"{index + 1}/{len(STEPS)} {STEP_LABELS[step]}")
+        with st.container(horizontal=True, width="content", vertical_alignment="center"):
+            demo_badge()
+            st.caption(f"{index + 1}/{len(STEPS)}")
 
 
 def bottom() -> DeltaGenerator:

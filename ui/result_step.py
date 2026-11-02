@@ -1,5 +1,7 @@
 """4단계: 사람별 정산 표, 송금 메시지, 결과 JSON 내려받기."""
 
+import html
+
 import pandas as pd
 import streamlit as st
 from pydantic import ValidationError
@@ -55,9 +57,11 @@ def render_result() -> None:
 
     st.header("이렇게 나누면 돼요", anchor=False)
     balances = compute_balances(trip)
-    _render_people(balances, trip)
+    st.html(summary_html(trip))
     _render_transfers(plan_transfers(balances), trip)
-    with st.expander("자세히 보기"):
+    st.subheader("사람별 정산", anchor=False)
+    _render_people(balances, trip)
+    with st.expander("표로 보기", icon=":material/table_rows:"):
         _render_table(balances, trip)
     bottom().download_button(
         "정산 파일 저장하기",
@@ -72,6 +76,27 @@ def render_result() -> None:
     )
     # 위치 조회가 느려도 저장 버튼이 먼저 보이도록 맨 마지막에 그린다(버튼은 화면 아래 고정이다).
     render_map(trip)
+
+
+def summary_html(trip: Trip) -> str:
+    """영수증 한 장처럼 생긴 요약. 여행 이름은 사용자가 적은 값이라 이스케이프한다."""
+    active = [e for e in trip.expenses if not e.excluded]
+    total = sum(e.amount for e in active)
+    period = f"{trip.start_date:%m.%d} ~ {trip.end_date:%m.%d}"
+    rows = [
+        ("결제", f"{len(active)}건"),
+        ("함께한 사람", f"{len(trip.members)}명"),
+        ("1인 평균", format_won(round(total / len(trip.members)))),
+    ]
+    if trip.mode == "fund":
+        rows.append(("1인 회비", format_won(trip.fund_per_person)))
+    items = "".join(f"<dt>{label}</dt><dd>{value}</dd>" for label, value in rows)
+    return (
+        '<div class="tv-slip">'
+        f'<p class="tv-label">{html.escape(trip.name)} <span>{period}</span></p>'
+        f'<p class="tv-total">{format_won(total)}</p>'
+        f"<dl>{items}</dl></div>"
+    )
 
 
 def _render_people(balances: list[Balance], trip: Trip) -> None:
@@ -143,7 +168,7 @@ def copy_text(transfer: Transfer, trip: Trip) -> str:
 
 
 def _render_transfers(transfers: list[Transfer], trip: Trip) -> None:
-    st.subheader("송금 메시지", anchor=False)
+    st.subheader("보낼 돈", anchor=False)
     if not transfers:
         st.success("주고받을 돈이 없어요.")
         return
@@ -155,6 +180,18 @@ def _render_transfers(transfers: list[Transfer], trip: Trip) -> None:
         elif _is_leader_wallet(transfer, trip):
             st.info(f"대표 몫 환급: 대표 {trip.leader}님이 회비 지갑에서 {amount}을 가져가요")
         else:
-            text = copy_text(transfer, trip)
-            st.code(text, language=None, wrap_lines=True)
-            copy_button(text, key=f"copy_{number}")
+            with st.container(border=True):
+                with st.container(
+                    horizontal=True,
+                    horizontal_alignment="distribute",
+                    vertical_alignment="center",
+                ):
+                    st.markdown(
+                        f"**{transfer.sender}** :gray[:material/arrow_forward:] "
+                        f"**{transfer.receiver}**",
+                        width="content",
+                    )
+                    st.markdown(f"### {amount}", anchors=False, width="content")
+                text = copy_text(transfer, trip)
+                st.code(text, language=None, wrap_lines=True)
+                copy_button(text, key=f"copy_{number}")

@@ -105,7 +105,7 @@ def test_build_notices():
         Trip(**TRIP),
     )
     assert notes == [
-        "a.jpg: 인식 실패(AI 호출 실패). 직접 추가해 주세요.",
+        "a.jpg: 읽지 못했어요. AI 호출 실패. 직접 추가해 주세요.",
         "a.jpg: 영수증이 아니어서 제외했어요.",
         "a.jpg: 원화(KRW)가 아닌 결제(JPY)라서 제외했어요.",
     ]

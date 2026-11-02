@@ -1,7 +1,8 @@
-"""3단계: 결제 건을 고치고, 결제자와 참석자를 정하고, 영수증 없는 지출을 추가한다."""
+"""3단계: 날짜별 결제 목록에서 참석자를 바로 고치고, 행을 펼쳐 금액·결제자 등을 고친다."""
 
 from collections import Counter
-from datetime import datetime, time
+from datetime import date, datetime, time
+from itertools import groupby
 
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
@@ -10,7 +11,7 @@ from core.expense_builder import UNKNOWN_MERCHANT, find_duplicates, sort_expense
 from core.payment_message import format_won
 from core.schema import FUND_WALLET, Expense, Trip
 from ui.layout import bottom_button
-from ui.state import get_trip, go_to, init_widget, set_trip
+from ui.state import get_trip, go_to, init_widget, session, set_trip
 
 
 def default_payer(trip: Trip) -> str:
@@ -57,103 +58,197 @@ def expense_labels(trip: Trip) -> dict[str, str]:
     return labels
 
 
+CATEGORY_ICONS = {
+    "food": "restaurant",
+    "cafe": "local_cafe",
+    "lodging": "hotel",
+    "transport": "directions_car",
+    "shopping": "shopping_bag",
+    "activity": "attractions",
+    "etc": "receipt_long",
+}
+WEEKDAYS = "월화수목금토일"
+OPENED_KEY = "rv_opened"
+
+
+def day_label(day: date | None) -> str:
+    if day is None:
+        return "날짜 모름"
+    return f"{day.month}월 {day.day}일 {WEEKDAYS[day.weekday()]}요일"
+
+
 def render_review() -> None:
     st.header("결제 내역을 확인해 주세요", anchor=False)
-    st.caption("금액과 결제자를 확인하고, 빠진 사람은 체크를 풀어 주세요.")
     trip = get_trip()
+    # 합계는 위젯 값을 반영한 뒤에 채운다. 먼저 그리면 금액을 고친 직후 옛 합계가 보인다.
+    summary = st.container()
     if not trip.expenses:
         st.info("아직 결제가 없어요. 영수증을 올리거나 아래에서 직접 추가해 주세요.")
+    else:
+        st.caption("함께하지 않은 사람은 이름을 눌러 빼 주세요.")
+    duplicated = _render_duplicates(trip)
 
-    labels = expense_labels(trip)
-    _render_duplicates(trip, labels)
-    updated = [
-        _render_card(number, e, trip, labels[e.expense_id])
-        for number, e in enumerate(trip.expenses, start=1)
-    ]
+    updated: list[Expense] = []
+    for index, (day, group) in enumerate(groupby(trip.expenses, key=_expense_day)):
+        head = st.container(
+            key=f"day_head_{index}",
+            horizontal=True,
+            horizontal_alignment="distribute",
+            vertical_alignment="bottom",
+        )
+        rows = [_render_row(e, trip, e.expense_id in duplicated) for e in group]
+        _fill_day_head(head, day, rows)
+        updated.extend(rows)
     if updated != trip.expenses:
         # 날짜·시각을 고치면 순서가 바뀔 수 있다. 위젯 key는 결제 건 id라서 다시 정렬해도 값이 유지된다.
         set_trip(trip.model_copy(update={"expenses": sort_expenses(updated)}))
+    _fill_summary(summary, updated)
 
-    _render_manual_form()
+    st.space("small")
+    with st.expander("영수증 없는 지출 추가", icon=":material/add:"):
+        _render_manual_form()
     bottom_button("정산하기", key="review_next", on_click=go_to, args=("정산",))
 
 
-def _render_duplicates(trip: Trip, labels: dict[str, str]) -> None:
-    active = [e for e in trip.expenses if not e.excluded]
-    for first, second in find_duplicates(active):
-        st.warning(
-            f"'{labels[first]}'와 '{labels[second]}'는 금액이 같고 10분 안에 결제했어요. "
-            "같은 결제라면 하나를 '정산에서 제외'로 체크해 주세요.",
-            title="중복 결제일 수 있어요",
-        )
+def _expense_day(e: Expense) -> date | None:
+    return e.paid_at.date() if e.paid_at else None
 
 
-def _render_card(number: int, e: Expense, trip: Trip, label: str) -> Expense:
-    """카드 하나를 그리고, 위젯 값이 바뀌었으면 고친 결제 건을 돌려준다."""
+def _active_total(expenses: list[Expense]) -> int:
+    return sum(e.amount for e in expenses if not e.excluded)
+
+
+def _fill_summary(summary: DeltaGenerator, expenses: list[Expense]) -> None:
+    if not expenses:
+        return
+    count = sum(1 for e in expenses if not e.excluded)
+    with summary.container(
+        horizontal=True, horizontal_alignment="distribute", vertical_alignment="bottom"
+    ):
+        st.caption(f"정산할 결제 {count}건", width="content")
+        st.markdown(f"### {format_won(_active_total(expenses))}", anchors=False, width="content")
+
+
+def _fill_day_head(head: DeltaGenerator, day: date | None, rows: list[Expense]) -> None:
+    head.markdown(day_label(day), width="content")
+    head.caption(format_won(_active_total(rows)), width="content")
+
+
+def _render_duplicates(trip: Trip) -> set[str]:
+    """중복 의심 결제를 위에 한 번만 알리고, 해당 결제 id를 돌려준다(행에도 표시한다)."""
+    by_id = {e.expense_id: e for e in trip.expenses}
+    pairs = find_duplicates([e for e in trip.expenses if not e.excluded])
+    if not pairs:
+        return set()
+    lines = []
+    for first, _ in pairs:
+        e = by_id[first]
+        when = e.paid_at.strftime("%H:%M") + " " if e.paid_at and e.time_known else ""
+        lines.append(f"{e.merchant_name} {when}결제가 두 번 있어요.")
+    st.warning(
+        " ".join(lines) + " 같은 결제라면 하나를 열어 '정산에서 빼기'를 켜 주세요.",
+        title="중복 결제일 수 있어요",
+        icon=":material/content_copy:",
+    )
+    return {eid for pair in pairs for eid in pair}
+
+
+def _render_row(e: Expense, trip: Trip, duplicated: bool) -> Expense:
+    """결제 한 줄. 참석자는 바로 고치고, 나머지는 펼쳐서 고친다. 바뀌었으면 고친 결제 건을 돌려준다."""
     eid = e.expense_id
-    _init_card_widgets(e, trip)
+    opened = eid in session().get(OPENED_KEY, set())
+    init_widget(f"part_{eid}", [m for m in trip.members if m in e.participants])
+    with st.container(key=f"row_{eid}"):
+        head = st.container(horizontal=True, vertical_alignment="center", gap="small")
+        notes = st.container(gap=None)
+        participants = st.pills(
+            "함께한 사람",
+            trip.members,
+            selection_mode="multi",
+            key=f"part_{eid}",
+            label_visibility="collapsed",
+        )
+        changes = _render_editor(e, trip) if opened else {}
+    updated = _apply(e, {**changes, "participants": list(participants)})
+    _fill_row_head(head, updated, opened)
+    for warning in [*e.warnings, *(["같은 결제가 하나 더 있어요."] if duplicated else [])]:
+        notes.caption(f":orange[:material/error: {warning}]")
+    return updated
+
+
+def _fill_row_head(head: DeltaGenerator, e: Expense, opened: bool) -> None:
+    with head.container(key=f"ico_{e.expense_id}", width=40):
+        st.markdown(f":material/{CATEGORY_ICONS.get(e.category, 'receipt_long')}:")
+    with head.container(key=f"rt_{e.expense_id}", gap=None):
+        st.markdown(f"~~{e.merchant_name}~~" if e.excluded else f"**{e.merchant_name}**")
+        when = e.paid_at.strftime("%H:%M") if e.paid_at and e.time_known else "시간 모름"
+        st.caption("정산에서 뺐어요" if e.excluded else f"{when}, {e.payer} 결제")
+    won = format_won(e.amount)
+    head.markdown(f":gray[~~{won}~~]" if e.excluded else f"**{won}**", width="content")
+    head.button(
+        "접기" if opened else "수정",
+        key=f"rv_open_{e.expense_id}",
+        type="tertiary",
+        on_click=_toggle_editor,
+        args=(e.expense_id,),
+    )
+
+
+def _toggle_editor(eid: str) -> None:
+    opened = set(session().get(OPENED_KEY, set()))
+    if eid in opened:
+        opened.discard(eid)
+        # 다시 펼칠 때 결제 건의 최신 값으로 채우도록 수정 칸 값을 지운다.
+        for key in [*(f"rv_{field}_{eid}" for field in EDIT_FIELDS), f"excl_{eid}"]:
+            session().pop(key, None)
+    else:
+        opened.add(eid)
+    session()[OPENED_KEY] = opened
+
+
+EDIT_FIELDS = ("name", "amount", "date", "notime", "time", "addr", "payer")
+
+
+def _render_editor(e: Expense, trip: Trip) -> dict:
+    """펼친 행의 수정 칸. 위젯 값으로 만든 변경 내용을 돌려준다."""
+    eid = e.expense_id
+    _init_editor_widgets(e)
     payer_options = [*trip.members, *([FUND_WALLET] if trip.mode == "fund" else [])]
     if e.payer not in payer_options:
         payer_options.append(e.payer)
-
-    with st.container(border=True):
-        # 머리줄은 위젯 값을 읽은 뒤에 채운다. 먼저 그리면 금액을 고친 직후 옛 금액이 보인다.
-        head = st.container(
-            horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"
-        )
-        for warning in e.warnings:
-            st.warning(warning)
-
-        name_col, amount_col = st.columns([3, 2])
-        name = name_col.text_input("상호", key=f"rv_name_{eid}")
-        amount = amount_col.number_input("금액 (원)", min_value=0, step=100, key=f"rv_amount_{eid}")
-        date_col, time_col, unknown_col = st.columns([2, 2, 1], vertical_alignment="bottom")
-        day = date_col.date_input("날짜", key=f"rv_date_{eid}")
-        no_time = unknown_col.checkbox("시간 모름", key=f"rv_notime_{eid}")
-        clock = time_col.time_input("시각", key=f"rv_time_{eid}", disabled=no_time)
-        address = st.text_input("주소", key=f"rv_addr_{eid}")
-        payer = st.selectbox("결제자", payer_options, key=f"rv_payer_{eid}")
-
-        st.caption("함께한 사람 (빠진 사람만 체크 해제)")
-        # 사람 수만큼 칸을 나누면 많을 때 이름이 잘린다. 가로로 놓고 넘치면 다음 줄로 보낸다.
-        with st.container(horizontal=True, gap="medium"):
-            participants = [m for m in trip.members if st.checkbox(m, key=f"part_{eid}_{m}")]
-        excluded = st.checkbox("정산에서 제외", key=f"excl_{eid}")
-        _render_card_head(head, number, e, label, int(amount), excluded)
-
+    with st.container(key=f"edit_{eid}"):
+        name = st.text_input("상호", key=f"rv_name_{eid}")
+        amount = st.number_input("금액 (원)", min_value=0, step=100, key=f"rv_amount_{eid}")
+        with st.container(horizontal=True, vertical_alignment="bottom"):
+            day = st.date_input("날짜", key=f"rv_date_{eid}")
+            no_time = st.session_state.get(f"rv_notime_{eid}", False)
+            clock = st.time_input("시각", key=f"rv_time_{eid}", disabled=no_time)
+        no_time = st.checkbox("시간 모름", key=f"rv_notime_{eid}")
+        address = st.text_input("주소", key=f"rv_addr_{eid}", help="여행 경로 지도에 쓰여요.")
+        payer = st.selectbox("결제한 사람", payer_options, key=f"rv_payer_{eid}")
+        excluded = st.toggle("정산에서 빼기", key=f"excl_{eid}")
     # '시간 모름'을 풀어도 시각을 고르기 전까지는 시간을 모르는 것으로 둔다(00:00으로 정하지 않는다).
     time_known = not no_time and clock is not None
     paid_at = datetime.combine(day, clock if time_known else time(0)) if day else None
-    changes = {
+    return {
         "merchant_name": name.strip() or UNKNOWN_MERCHANT,
         "merchant_address": address.strip() or None,
         "paid_at": paid_at,
         "time_known": paid_at is not None and time_known,
         "amount": int(amount),
         "payer": payer,
-        "participants": participants,
         "excluded": excluded,
     }
+
+
+def _apply(e: Expense, changes: dict) -> Expense:
     if all(getattr(e, field) == value for field, value in changes.items()):
         return e
     # model_copy는 얕은 복사라서 리스트는 새로 만든 것을 넘긴다.
-    return e.model_copy(update={**changes, "participants": list(participants)})
+    return e.model_copy(update=changes)
 
 
-def _render_card_head(
-    head: DeltaGenerator, number: int, e: Expense, label: str, amount: int, excluded: bool
-) -> None:
-    """영수증처럼 이름은 왼쪽, 금액은 오른쪽에 둔다."""
-    # 같은 상호가 여러 건이면 label에 이미 순번이 들어 있다.
-    title = label if label != e.merchant_name else f"#{number} {label}"
-    source = ":gray-badge[사진에서 읽음]" if e.source == "ai" else ":gray-badge[직접 입력]"
-    badges = source + (" :gray-badge[정산 제외]" if excluded else "")
-    head.markdown(f"**{title}** {badges}", width="content")
-    won = format_won(amount)
-    head.markdown(f"~~{won}~~" if excluded else f"**{won}**", width="content")
-
-
-def _init_card_widgets(e: Expense, trip: Trip) -> None:
+def _init_editor_widgets(e: Expense) -> None:
     eid = e.expense_id
     init_widget(f"rv_name_{eid}", e.merchant_name)
     init_widget(f"rv_amount_{eid}", e.amount)
@@ -162,14 +257,11 @@ def _init_card_widgets(e: Expense, trip: Trip) -> None:
     init_widget(f"rv_time_{eid}", e.paid_at.time() if e.paid_at and e.time_known else None)
     init_widget(f"rv_addr_{eid}", e.merchant_address or "")
     init_widget(f"rv_payer_{eid}", e.payer)
-    for m in trip.members:
-        init_widget(f"part_{eid}_{m}", m in e.participants)
     init_widget(f"excl_{eid}", e.excluded)
 
 
 def _render_manual_form() -> None:
-    st.subheader("영수증 없는 지출 추가", anchor=False)
-    with st.form("manual_form", clear_on_submit=True):
+    with st.form("manual_form", clear_on_submit=True, border=False):
         name_col, amount_col = st.columns([3, 2])
         merchant = name_col.text_input("상호·내용", key="manual_merchant", placeholder="주차비")
         amount = amount_col.number_input("금액 (원)", min_value=0, step=100, key="manual_amount")

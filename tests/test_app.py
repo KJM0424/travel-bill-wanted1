@@ -87,6 +87,11 @@ def _has_button(at: AppTest, key: str) -> bool:
     return any(b.key == key for b in at.button)
 
 
+def _open_editor(at: AppTest, eid: str) -> AppTest:
+    """검토 화면의 결제 행을 펼쳐 수정 칸을 연다."""
+    return at.button(key=f"rv_open_{eid}").click().run()
+
+
 # --- 업로드 단계 (Task 12) ---
 
 
@@ -222,12 +227,31 @@ def test_expense_labels_plain_when_unique():
 
 def test_review_unchecking_member_updates_participants(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(18000, "A", ["A", "B", "C"], id="cafe")])
-    at.checkbox(key="part_cafe_C").uncheck().run()
+    at.pills(key="part_cafe").set_value(["A", "B"]).run()
     assert at.session_state["trip"].expenses[0].participants == ["A", "B"]
+
+
+def test_review_editor_is_closed_until_row_opened(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(18000, "A", ["A", "B", "C"], id="cafe")])
+    assert not any(n.key == "rv_amount_cafe" for n in at.number_input)
+    _open_editor(at, "cafe")
+    assert at.number_input(key="rv_amount_cafe").value == 18000
+    at.button(key="rv_open_cafe").click().run()
+    assert not any(n.key == "rv_amount_cafe" for n in at.number_input)
+
+
+def test_review_shows_total_and_date_group(monkeypatch):
+    at = open_app_with_trip(
+        monkeypatch,
+        expenses=[exp(18000, "A", ["A", "B"], id="cafe", paid_at=datetime(2026, 10, 11, 15, 2))],
+    )
+    texts = " ".join(m.value for m in [*at.markdown, *at.caption])
+    assert "18,000원" in texts and "1건" in texts and "10월 11일" in texts
 
 
 def test_review_change_payer_and_amount(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(18000, "A", ["A", "B", "C"], id="cafe")])
+    _open_editor(at, "cafe")
     at.selectbox(key="rv_payer_cafe").set_value("B").run()
     at.number_input(key="rv_amount_cafe").set_value(20000).run()
     e = at.session_state["trip"].expenses[0]
@@ -241,24 +265,27 @@ def test_review_fund_payer_options_include_wallet(monkeypatch):
         mode="fund",
         fee=10000,
     )
+    _open_editor(at, "cafe")
     assert FUND_WALLET in at.selectbox(key="rv_payer_cafe").options
 
 
 def test_review_exclude(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[dup_a, dup_b])
-    at.checkbox(key="excl_d2").check().run()
+    _open_editor(at, "d2")
+    at.toggle(key="excl_d2").set_value(True).run()
     assert at.session_state["trip"].expenses[1].excluded
 
 
 def test_review_shows_duplicate_warning(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[dup_a, dup_b])
-    assert any("10분 안에" in w.value for w in at.warning)
+    assert any("두 번" in w.value for w in at.warning)
 
 
 def test_review_shows_expense_warnings(monkeypatch):
     e = exp(18000, "A", ["A"], id="w").model_copy(update={"warnings": ["합계와 품목 합이 다름"]})
     at = open_app_with_trip(monkeypatch, expenses=[e])
-    assert any("합계와 품목 합이 다름" in w.value for w in at.warning)
+    texts = [m.value for m in [*at.caption, *at.markdown]]
+    assert any("합계와 품목 합이 다름" in t for t in texts)
 
 
 def test_review_manual_add_form(monkeypatch):
@@ -359,11 +386,11 @@ def test_result_has_download_button(monkeypatch):
 
 def test_load_trip_file_replaces_trip_and_resets_widgets(app_session):
     app_session["setup_members"] = "옛날 값"
-    app_session["part_e1_A"] = False
+    app_session["part_e1"] = ["B"]
     loaded = prepaid_trip_with_expenses()
     assert load_trip_file(export_trip(loaded)) is None
     assert app_session["trip"] == loaded
-    assert "setup_members" not in app_session and "part_e1_A" not in app_session
+    assert "setup_members" not in app_session and "part_e1" not in app_session
 
 
 def test_load_trip_file_bad_file_keeps_trip(app_session):
@@ -374,8 +401,9 @@ def test_load_trip_file_bad_file_keeps_trip(app_session):
 
 def test_review_card_title_shows_number_once(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[dup_a, dup_b])
+    # 같은 상호는 시각으로 구분한다. 내부 순번(#1, #2)은 화면에 보이지 않는다.
     titles = [m.value for m in at.markdown if "카페" in m.value]
-    assert titles and not any(t.count("#2") > 1 or t.count("#1") > 1 for t in titles)
+    assert titles and not any("#" in t for t in titles)
 
 
 def test_setup_readding_member_checks_them_on_existing_expenses(monkeypatch):
@@ -417,6 +445,7 @@ def test_review_date_change_resorts_expenses(monkeypatch):
         time_known=True,
     )
     at = open_app_with_trip(monkeypatch, expenses=[first, second])
+    _open_editor(at, "x2")
     at.date_input(key="rv_date_x2").set_value((DUP_TIME - timedelta(days=1)).date()).run()
     assert [e.expense_id for e in at.session_state["trip"].expenses] == ["x2", "x1"]
 
@@ -433,6 +462,7 @@ def test_load_trip_file_clears_previous_upload_notices(app_session):
 def test_review_unchecking_time_unknown_does_not_set_midnight(monkeypatch):
     no_time = exp(1000, "A", ["A"], id="t", paid_at=datetime(2026, 10, 11), time_known=False)
     at = open_app_with_trip(monkeypatch, expenses=[no_time])
+    _open_editor(at, "t")
     at.checkbox(key="rv_notime_t").uncheck().run()
     assert at.session_state["trip"].expenses[0].time_known is False
     at.time_input(key="rv_time_t").set_value(datetime(2026, 10, 11, 9, 30).time()).run()
@@ -462,15 +492,15 @@ def test_review_many_members_do_not_use_one_column_each(monkeypatch):
     # 사람 수만큼 칸을 나누면 칸이 좁아져 이름이 글자 단위로 줄바꿈된다.
     in_columns = [w for col in at.columns for w in col.children.values()]
     assert not any(str(getattr(w, "key", "")).startswith("part_") for w in in_columns)
-    assert all(at.checkbox(key=f"part_m_{m}").value for m in members)
+    assert at.pills(key="part_m").value == members
 
 
 def test_setup_leader_follows_member_changes(monkeypatch):
     at = open_app(monkeypatch)
     fill_setup(at, members="A, B")
     at.text_input(key="setup_members").input("B, C").run()
-    leader_box = next(s for s in at.selectbox if s.label == "대표 (총무)")
-    assert (leader_box.options, leader_box.value) == (["B", "C"], "B")
+    leader = at.pills(key="setup_leader")
+    assert (leader.options, leader.value) == (["B", "C"], "B")
     at.button(key="setup_save").click().run()
     assert at.session_state["trip"].leader == "B"
 
@@ -478,7 +508,7 @@ def test_setup_leader_follows_member_changes(monkeypatch):
 def test_setup_leader_keeps_choice_when_members_grow(monkeypatch):
     at = open_app(monkeypatch)
     fill_setup(at, members="A, B")
-    next(s for s in at.selectbox if s.label == "대표 (총무)").set_value("B").run()
+    at.pills(key="setup_leader").set_value("B").run()
     at.text_input(key="setup_members").input("A, B, C").run()
     at.button(key="setup_save").click().run()
     assert at.session_state["trip"].leader == "B"
@@ -493,7 +523,7 @@ def test_start_screen_shows_name_and_one_start_button(monkeypatch):
     monkeypatch.setenv("RECOGNIZER", "mock")
     monkeypatch.setenv("APP_PASSWORD", "")
     at = AppTest.from_file(APP_PATH, default_timeout=30).run()
-    assert any(APP_NAME in t.value for t in at.title)
+    assert any(APP_NAME in m.value for m in at.markdown)
     assert [b.key for b in at.button if b.proto.type == "primary"] == ["start_begin"]
     at.button(key="start_begin").click().run()
     assert _has_button(at, "setup_save")
@@ -529,11 +559,12 @@ def test_mock_badge_only_when_mock(monkeypatch):
 
 @pytest.mark.parametrize(
     ("step", "label"),
-    [("설정", "1/4 설정"), ("업로드", "2/4 영수증"), ("검토", "3/4 확인"), ("정산", "4/4 정산")],
+    [("설정", "1/4"), ("업로드", "2/4"), ("검토", "3/4"), ("정산", "4/4")],
 )
 def test_progress_shows_step(monkeypatch, step, label):
     at = open_app_with_trip(monkeypatch, expenses=[exp(9000, "A", ["A", "B", "C"])], step=step)
-    assert any(label in p.text for p in at.get("progress"))
+    assert any(label in c.value for c in at.caption)
+    assert not at.get("progress")
 
 
 def test_setup_save_moves_to_upload(monkeypatch):
@@ -718,3 +749,14 @@ def test_render_map_skips_transport_and_manual(monkeypatch):
     at, fake = open_map(monkeypatch, expenses, {"e1": GeoResult((33.4, 126.3))})
     assert fake.asked == [["e1"]]
     assert "택시" not in all_text(at) and "직접 쓴 돈" not in all_text(at)
+
+
+def test_result_summary_counts_only_included_and_escapes_name():
+    from ui.result_step import summary_html
+
+    kept = exp(30000, "A", ["A", "B", "C"], id="k")
+    dropped = exp(9000, "A", ["A"], id="d").model_copy(update={"excluded": True})
+    trip = trip_with([kept, dropped]).model_copy(update={"name": "<b>제주</b>"})
+    html_text = summary_html(trip)
+    assert "30,000원" in html_text and "1건" in html_text and "10,000원" in html_text
+    assert "<b>제주</b>" not in html_text and "&lt;b&gt;" in html_text

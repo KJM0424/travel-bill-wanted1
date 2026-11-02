@@ -1,22 +1,37 @@
-"""시작 화면: 서비스 소개와 '정산 시작하기' 버튼 하나. 저장한 정산 파일 불러오기는 보조로 둔다."""
+"""시작 화면: 무엇을 하는 앱인지 세 단계로 보여 주고 '정산 시작하기' 버튼 하나를 둔다."""
 
 import streamlit as st
 
-from ui.branding import APP_NAME, TAGLINE
+from ui.branding import APP_NAME
 from ui.layout import bottom_button, demo_badge, flash
 from ui.setup_step import load_trip_file
 from ui.state import go_to, session
 
+STEPS_HTML = """
+<ol class="tv-steps">
+  <li><span class="tv-num">1</span><div><b>영수증을 한 번에 올려요</b>
+    <span>종이 영수증도, 숙소 예약 캡처도 괜찮아요</span></div></li>
+  <li><span class="tv-num">2</span><div><b>안 간 사람만 빼요</b>
+    <span>카페에 빠진 친구는 이름만 누르면 돼요</span></div></li>
+  <li><span class="tv-num">3</span><div><b>송금 메시지를 보내요</b>
+    <span>누가 누구에게 얼마를 보낼지 정리해 드려요</span></div></li>
+</ol>
+"""
+
 
 def render_start() -> None:
-    st.space("large")
-    # 로고 자리. 강조색은 이 이름과 주요 버튼에만 쓴다.
-    st.title(f":primary[{APP_NAME}]", anchor=False)
-    st.markdown(f"### {TAGLINE}", anchors=False)
-    st.caption("영수증 사진을 올리면 누가 누구에게 얼마를 보내면 되는지 정리해 드려요.")
-    demo_badge()
+    with st.container(
+        horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"
+    ):
+        # 로고 자리. 강조색은 이 이름과 주요 버튼에만 쓴다.
+        st.markdown(f"#### :primary[{APP_NAME}]", anchors=False, width="content")
+        demo_badge()
     st.space("medium")
-    with st.expander("저장한 정산 파일 불러오기", icon=":material/folder_open:"):
+    st.markdown("# 여행 정산,<br>영수증 사진으로 끝내요", unsafe_allow_html=True)
+    st.space("small")
+    st.html(STEPS_HTML)
+    st.space("large")
+    with st.expander("저장한 정산 이어서 하기", icon=":material/folder_open:"):
         _render_import()
     bottom_button("정산 시작하기", key="start_begin", on_click=go_to, args=("설정",))
 
