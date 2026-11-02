@@ -645,7 +645,7 @@ def test_result_person_card_says_my_share(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
     open_people_tab(at)
     captions = [c.value for c in at.caption]
-    assert "낸 돈 30,000원, 나눌 몫 10,000원" in captions
+    assert "낸 돈 30,000원, 부담할 돈 10,000원" in captions
     assert not any("쓴 돈" in c for c in captions)
 
 
