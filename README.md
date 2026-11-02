@@ -23,6 +23,13 @@ API 호출 없이 화면만 확인하려면 mock 모드로 실행한다. 미리 
 RECOGNIZER=mock .venv/bin/streamlit run app.py
 ```
 
+### 시연용 정산 파일
+AI 호출 없이 검토·정산·여행 돌아보기를 바로 보여 주려면 시작 화면의 **저장한 정산 이어서 하기**에서 `eval/demo_trip.json`을 불러온다.
+- 생성 영수증 13장(`eval/images/synthetic/`)을 정확히 읽었다고 본 제주 2박 3일 여행이다. 가게는 실제 제주 가게이고 거래는 지어낸 것이다.
+- 일정: 9월 28일 숙소 미리 결제(여행 기간 밖 경고 예시) → 1일차 제주시·애월 → 2일차 중문·서귀포 → 3일차 성산·우도. 날짜마다 섬을 서→동으로 한 방향으로 돈다.
+- 결제자는 재민·수아·민호가 나눠 냈고, 첫날 카페에는 민호가 빠졌다. 총무 재민의 계좌(예시 번호)가 들어 있다.
+- 영수증 설정(`eval/synthetic_specs.json`)을 바꾸면 `python -m eval.make_synthetic --font <ttf>` 뒤에 `python -m eval.make_demo_trip`으로 다시 만든다. 둘이 어긋나면 테스트가 실패한다.
+
 ## 설정 값
 로컬은 `.env`, 배포는 Streamlit Secrets에서 읽는다(`core/config.py`). 빈 값은 없는 것으로 본다.
 

@@ -1148,3 +1148,9 @@ def test_row_toggle_button_is_stretched_over_the_whole_row():
 
     rule = re.search(r'\[class\*="st-key-rv_open_"\] \{([^}]*)\}', COLUMN_CSS).group(1)
     assert "width: 100% !important" in rule and "height: 100% !important" in rule
+
+
+def test_route_map_refits_after_the_frame_gets_its_size():
+    # 처음 맞춘 범위는 지도 칸 크기가 정해지기 전이라 한쪽으로 치우쳤다(3일차 성산·우도가 잘림).
+    html = build_route_map([stop("흑돼지", 0), stop("우도", 2, 33.51, 126.95)]).get_root().render()
+    assert "invalidateSize" in html and "fitBounds" in html and "126.95" in html
