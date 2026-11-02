@@ -73,7 +73,7 @@ def render_setup() -> None:
     with _section("sec_trip", "어떤 여행이었나요?"):
         st.text_input("여행 이름 (선택)", key="setup_name", placeholder="제주 2박 3일")
         with st.container(horizontal=True):
-            st.date_input("가는 날", key="setup_start")
+            st.date_input("가는 날", key="setup_start", on_change=_keep_end_after_start)
             st.date_input("오는 날", key="setup_end")
         _render_trip_length(session()["setup_start"], session()["setup_end"])
 
@@ -131,6 +131,17 @@ def render_setup() -> None:
 
     if bottom_button("다음", key="setup_save"):
         _save(trip, names)
+
+
+def _keep_end_after_start() -> None:
+    """가는 날을 오는 날 뒤로 옮기면 오는 날도 같은 날로 맞춘다. 사용자가 두 번 고치지 않게 한다."""
+    state = session()
+    if (
+        state.get("setup_end")
+        and state["setup_start"]
+        and state["setup_end"] < state["setup_start"]
+    ):
+        state["setup_end"] = state["setup_start"]
 
 
 def _section(key: str, title: str):

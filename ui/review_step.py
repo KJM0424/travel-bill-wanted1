@@ -10,7 +10,8 @@ from streamlit.delta_generator import DeltaGenerator
 from core.expense_builder import UNKNOWN_MERCHANT, find_duplicates, sort_expenses
 from core.payment_message import format_won
 from core.schema import FUND_WALLET, Expense, Trip
-from ui.layout import bottom_button
+from core.trip_story import trip_length_label
+from ui.layout import bottom_button, flash
 from ui.state import get_trip, go_to, init_widget, session, set_trip
 
 
@@ -83,20 +84,22 @@ def render_review() -> None:
     # 합계는 위젯 값을 반영한 뒤에 채운다. 먼저 그리면 금액을 고친 직후 옛 합계가 보인다.
     summary = st.container()
     if not trip.expenses:
-        st.info("아직 결제가 없어요. 영수증을 올리거나 아래에서 직접 추가해 주세요.")
+        _render_empty(trip)
     else:
         st.caption("결제를 누르면 함께한 사람과 금액을 고칠 수 있어요.")
     duplicated = _render_duplicates(trip)
 
     updated: list[Expense] = []
     for index, (day, group) in enumerate(groupby(trip.expenses, key=_expense_day)):
-        head = st.container(
-            key=f"day_head_{index}",
-            horizontal=True,
-            horizontal_alignment="distribute",
-            vertical_alignment="bottom",
-        )
-        rows = [_render_row(e, trip, e.expense_id in duplicated) for e in group]
+        # 날짜마다 흰 카드 하나(ui/layout.py의 .st-key-dg_).
+        with st.container(key=f"dg_{index}", gap=None):
+            head = st.container(
+                key=f"day_head_{index}",
+                horizontal=True,
+                horizontal_alignment="distribute",
+                vertical_alignment="bottom",
+            )
+            rows = [_render_row(e, trip, e.expense_id in duplicated) for e in group]
         _fill_day_head(head, day, rows)
         updated.extend(rows)
     if updated != trip.expenses:
@@ -283,13 +286,42 @@ def _init_editor_widgets(e: Expense) -> None:
     init_widget(f"excl_{eid}", e.excluded)
 
 
+def _render_empty(trip: Trip) -> None:
+    """결제가 하나도 없을 때. 이 여행에 맞춘 말로 다음 할 일을 알려 준다."""
+    with st.container(key="empty_state"):
+        st.markdown("### :primary[:material/receipt_long:]")
+        st.markdown(f"#### {trip.name}의 첫 영수증을 올려 볼까요?")
+        length = trip_length_label(trip.start_date, trip.end_date)
+        st.markdown(
+            f"{len(trip.members)}명이 함께한 {length} 여행이에요. "
+            "영수증을 올리면 날짜별로 정리해 드려요."
+        )
+        st.button(
+            "영수증 올리기",
+            key="empty_upload",
+            icon=":material/photo_camera:",
+            width="stretch",
+            on_click=go_to,
+            args=("업로드",),
+        )
+        st.caption("영수증이 없는 지출은 아래에서 직접 추가할 수 있어요.")
+
+
+def default_manual_day(trip: Trip) -> date:
+    """직접 추가할 때 날짜 기본값. 마지막 결제 날짜, 결제가 없으면 가는 날."""
+    days = [e.paid_at.date() for e in trip.expenses if e.paid_at]
+    return max(days, default=trip.start_date)
+
+
 def _render_manual_form() -> None:
     with st.form("manual_form", clear_on_submit=True, border=False):
         name_col, amount_col = st.columns([3, 2])
         merchant = name_col.text_input("내용", key="manual_merchant", placeholder="주차비")
         amount = amount_col.number_input("금액 (원)", min_value=0, step=100, key="manual_amount")
         date_col, time_col = st.columns(2)
-        day = date_col.date_input("날짜 (선택)", value=None, key="manual_date")
+        day = date_col.date_input(
+            "날짜 (선택)", value=default_manual_day(get_trip()), key="manual_date"
+        )
         clock = time_col.time_input("시각 (선택)", value=None, key="manual_time")
         submitted = st.form_submit_button(
             "추가하기", key="manual_add", icon=":material/add:", width="stretch"
@@ -305,4 +337,5 @@ def _render_manual_form() -> None:
         return
     paid_at = datetime.combine(day, clock or time(0)) if day else None
     set_trip(add_manual_expense(get_trip(), merchant, int(amount), paid_at, clock is not None))
+    flash("toast", f"{merchant.strip()} {format_won(int(amount))}을 추가했어요.")
     st.rerun()

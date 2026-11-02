@@ -52,6 +52,6 @@ def _render_import() -> None:
     if error:
         st.error(error)
         return
-    flash("success", "정산 파일을 불러왔어요. 이어서 확인해 보세요.")
+    flash("toast", "정산 파일을 불러왔어요.")
     go_to("검토")
     st.rerun()

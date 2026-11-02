@@ -113,10 +113,10 @@ def summary_html(trip: Trip) -> str:
 
 def _render_people(balances: list[Balance], trip: Trip) -> None:
     """사람마다 카드 하나. 보낼 돈·받을 돈을 크게 보여 준다."""
-    for b in balances:
+    for index, b in enumerate(balances):
         name = f"{b.name} (총무 {trip.leader})" if b.name == FUND_WALLET else b.name
         with st.container(
-            border=True,
+            key=f"pc_{index}",
             horizontal=True,
             horizontal_alignment="distribute",
             vertical_alignment="center",
@@ -190,7 +190,10 @@ def transfer_copies(transfer: Transfer, trip: Trip) -> list[tuple[str, str]]:
 
 def _render_transfers(transfers: list[Transfer], trip: Trip) -> None:
     if not transfers:
-        st.success("주고받을 돈이 없어요.")
+        with st.container(key="empty_state"):
+            st.markdown("### :primary[:material/handshake:]")
+            st.markdown("#### 모두 쓴 만큼 냈어요")
+            st.caption("주고받을 돈이 없어요. 정산 파일만 저장해 두면 돼요.")
         return
     st.caption("메시지를 복사해 단톡방에 보내 주세요.")
     for number, transfer in enumerate(transfers):
@@ -202,7 +205,7 @@ def _render_transfers(transfers: list[Transfer], trip: Trip) -> None:
                 f"회비가 남았어요. 총무 {trip.leader}님 몫 {amount}은 남은 회비에서 가져가면 돼요."
             )
         else:
-            with st.container(border=True):
+            with st.container(key=f"tr_{number}"):
                 with st.container(
                     horizontal=True,
                     horizontal_alignment="distribute",

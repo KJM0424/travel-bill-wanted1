@@ -60,6 +60,13 @@ GEO_CACHE_KEY = "geo_cache"
 RETRY_FAILED_SECONDS = 30
 RETRY_NOT_FOUND_SECONDS = 600
 NO_KEY_INFO = "지도를 보려면 카카오 지도 설정이 필요해요. 정산은 그대로 할 수 있어요."
+SKELETON_HTML = (
+    '<div role="status" aria-label="결제한 곳을 지도에 찍고 있어요">'
+    '<div class="tv-skel-card"><div class="tv-skel" style="height:24px;width:64%"></div>'
+    '<div class="tv-skel" style="height:16px;width:88%"></div>'
+    '<div class="tv-skel" style="height:16px;width:72%"></div></div>'
+    f'<div class="tv-skel" style="height:{MAP_HEIGHT}px"></div></div>'
+)
 LOAD_ERROR = "위치를 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요."
 MARKER_HTML = (
     '<div style="width:30px;height:30px;border-radius:50%;background:{color};color:#fff;'
@@ -417,8 +424,11 @@ def _locate_places(places: list[Expense]) -> dict[str, GeoResult]:
     if not api_key:
         st.info(NO_KEY_INFO)
         return {}
-    with st.spinner("결제한 곳을 지도에 찍고 있어요"):
-        results = locate(places, api_key)
+    # 스피너 대신 요약 카드와 지도 모양의 자리를 먼저 보여 준다(ui/layout.py의 .tv-skel).
+    skeleton = st.empty()
+    skeleton.html(SKELETON_HTML)
+    results = locate(places, api_key)
+    skeleton.empty()
     if all(results[e.expense_id].failed for e in places):
         # 키 오류·한도 초과·네트워크 문제. 주소가 틀려서 못 찾은 것과 구분한다.
         st.warning(LOAD_ERROR)
