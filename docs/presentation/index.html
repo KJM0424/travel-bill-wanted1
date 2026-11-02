@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Travill 발표</title>
+<style>
+/* 앱(.streamlit/config.toml, ui/layout.py)과 같은 토큰. 무대는 1920×1080 고정이고 화면에 맞춰 줄인다. */
+@font-face {
+  font-family: "Pretendard"; font-weight: 45 920; font-display: swap;
+  src: url("../../static/fonts/PretendardVariable.woff2") format("woff2");
+}
+:root {
+  --bg: #F3F5F4; --surface: #FFFFFF; --fill: #F1F3F2; --line: #E3E7E5;
+  --primary: #17654C; --primary-soft: #E7F1EC;
+  --ink: #191F28; --sub: #5B6572; --weak: #8B95A1;
+  --v1: #6F95D8; --v2: #11875C;
+  --shadow: 0 1px 2px rgba(16, 24, 32, 0.04), 0 8px 32px rgba(16, 24, 32, 0.05);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #DDE2E0; }
+body {
+  font-family: "Pretendard", -apple-system, sans-serif; color: var(--ink);
+  font-variant-numeric: tabular-nums; word-break: keep-all; overflow: hidden;
+}
+.deck { position: fixed; inset: 0; display: grid; place-items: center; }
+.slide {
+  position: absolute; width: 1920px; height: 1080px; background: var(--bg);
+  padding: 96px 128px; display: none; flex-direction: column; transform-origin: center center;
+}
+.slide.active { display: flex; }
+.slide > h2 + * { margin-top: auto; }
+.slide > :nth-last-child(2) { margin-bottom: auto; }
+.kicker { font-size: 26px; font-weight: 600; color: var(--primary); margin-bottom: 24px; }
+h1 { font-size: 96px; line-height: 1.15; letter-spacing: -0.03em; font-weight: 800; }
+h2 { font-size: 60px; line-height: 1.2; letter-spacing: -0.025em; font-weight: 750; margin-bottom: 40px; }
+h3 { font-size: 32px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 12px; }
+p, li { font-size: 28px; line-height: 1.55; color: var(--ink); }
+.sub { color: var(--sub); }
+.small { font-size: 22px; color: var(--sub); line-height: 1.5; }
+.card { background: var(--surface); border-radius: 24px; box-shadow: var(--shadow); padding: 40px; }
+.row { display: flex; gap: 40px; }
+.card.big { padding: 56px 48px; }
+.card.big h3 { font-size: 38px; margin-bottom: 20px; }
+.card.big p, .card.big li { font-size: 30px; line-height: 1.6; }
+.grow { flex: 1; min-width: 0; }
+.foot { position: absolute; left: 128px; right: 128px; bottom: 48px; display: flex;
+  justify-content: space-between; font-size: 20px; color: var(--weak); }
+ul.plain { list-style: none; display: grid; gap: 16px; }
+ul.plain li { padding-left: 32px; position: relative; }
+ul.plain li::before { content: ""; position: absolute; left: 4px; top: 16px; width: 10px; height: 10px;
+  border-radius: 50%; background: var(--primary); }
+b, strong { font-weight: 700; }
+.num { font-weight: 800; letter-spacing: -0.02em; }
+.tag { display: inline-block; font-size: 18px; font-weight: 600; color: var(--primary);
+  background: var(--primary-soft); border-radius: 999px; padding: 6px 16px; margin-right: 8px; }
+ol.steps { list-style: none; display: grid; gap: 20px; }
+ol.steps li { display: grid; grid-template-columns: 48px 1fr; gap: 20px; align-items: center; }
+ol.steps li > span { width: 48px; height: 48px; border-radius: 50%; background: var(--primary-soft);
+  color: var(--primary); font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center; }
+ol.steps b { font-size: 30px; } ol.steps p { font-size: 25px; color: var(--sub); line-height: 1.4; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.chips span { white-space: nowrap; font-size: 21px; font-weight: 600; color: #333D4B; background: var(--fill);
+  border-radius: 999px; padding: 6px 14px; }
+.chips span.on { color: var(--primary); background: var(--primary-soft); }
+
+/* 기억에 남는 한 가지: 아래가 톱니인 영수증(앱 정산 요약과 같은 모양) */
+.slip { position: relative; background: var(--surface); border-radius: 24px 24px 0 0; padding: 48px;
+  box-shadow: 0 1px 2px rgba(16, 24, 32, 0.04); }
+.slip::after { content: ""; position: absolute; left: 0; right: 0; bottom: -16px; height: 16px;
+  background: radial-gradient(circle at 16px 0, var(--surface) 11px, transparent 11.5px) 0 0 / 32px 16px repeat-x; }
+.slip dl { display: grid; grid-template-columns: 1fr auto; gap: 16px 32px; font-size: 28px; }
+.slip dt { color: var(--sub); } .slip dd { text-align: right; font-weight: 700; }
+
+/* 휴대폰 화면 */
+.phone { width: 348px; border-radius: 36px; overflow: hidden; background: var(--bg);
+  box-shadow: 0 2px 4px rgba(16, 24, 32, 0.06), 0 16px 48px rgba(16, 24, 32, 0.10); border: 8px solid #FFFFFF; }
+.phone img { display: block; width: 100%; height: 540px; object-fit: cover; object-position: top; }
+.shot-label { font-size: 26px; font-weight: 700; margin-top: 20px; }
+.shot-sub { font-size: 21px; color: var(--sub); margin-top: 4px; }
+
+/* 구조 그림 */
+.layer { display: grid; gap: 16px; }
+.box { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); padding: 24px 28px; }
+.box h4 { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+.box p { font-size: 20px; color: var(--sub); line-height: 1.45; }
+.box.accent { background: var(--primary); }
+.box.accent h4, .box.accent p { color: #FFFFFF; }
+.arrow { font-size: 32px; color: var(--weak); text-align: center; line-height: 1; }
+
+.arch { display: grid; gap: 12px; }
+.tier { display: grid; grid-template-columns: 300px 1fr; align-items: center; gap: 32px;
+  background: var(--surface); border-radius: 24px; box-shadow: var(--shadow); padding: 28px 32px; }
+.tier-name { font-size: 34px; font-weight: 750; }
+.tier-name small { display: block; font-size: 21px; font-weight: 500; color: var(--sub); margin-top: 4px; }
+.mods { display: flex; flex-wrap: wrap; gap: 12px; }
+.mods span { font-size: 25px; font-weight: 600; background: var(--fill); border-radius: 12px; padding: 14px 20px; }
+.mods span em { display: block; font-style: normal; font-size: 19px; font-weight: 500; color: var(--sub); margin-top: 2px; }
+.tier.core { background: var(--primary); }
+.tier.core .tier-name, .tier.core .tier-name small { color: #FFFFFF; }
+.tier.core .tier-name small { opacity: 0.8; }
+.tier.core .mods span { background: rgba(255, 255, 255, 0.14); color: #FFFFFF; }
+.tier.core .mods span em { color: rgba(255, 255, 255, 0.8); }
+
+/* 표 */
+table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 26px; }
+th { text-align: left; font-weight: 600; color: var(--sub); padding: 0 24px 16px 0; font-size: 22px; }
+td { padding: 20px 24px 20px 0; border-top: 1px solid var(--line); vertical-align: top; line-height: 1.45; }
+td.r, th.r { text-align: right; padding-right: 0; }
+
+/* 탐색 */
+.nav { position: fixed; right: 24px; top: 20px; font: 600 14px Pretendard, sans-serif; color: #4E5968;
+  background: rgba(255, 255, 255, 0.85); border-radius: 999px; padding: 8px 16px; }
+@media print {
+  @page { size: 1920px 1080px; margin: 0; }
+  html, body { background: var(--bg); overflow: visible; height: auto; }
+  .deck { position: static; display: block; }
+  .slide { display: flex !important; position: relative; transform: none !important; break-after: page; }
+  .nav { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- 1. 표지 -->
+<section class="slide" data-title="표지">
+  <div class="row" style="flex:1;align-items:center;gap:120px">
+    <div class="grow">
+      <p class="kicker">Travill(트래빌) · 원티드 1차 프로젝트 · 개발</p>
+      <h1>여행 정산,<br>영수증 사진으로 끝내요</h1>
+      <p class="sub" style="margin-top:32px;font-size:32px;white-space:nowrap">영수증을 올리면 AI가 읽고, 송금까지 정리해 주는 정산 앱</p>
+    </div>
+    <div class="slip" style="width:560px">
+      <p style="font-size:24px;font-weight:600">제주 2박 3일 <span class="sub" style="font-weight:500;margin-left:12px">10.10 ~ 10.12</span></p>
+      <p class="num" style="font-size:64px;margin:8px 0 32px">769,360원</p>
+      <dl>
+        <dt>영수증</dt><dd>13장</dd>
+        <dt>함께한 사람</dt><dd>3명</dd>
+        <dt>결제한 사람</dt><dd>3명</dd>
+        <dt>보낼 송금</dt><dd>2건</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="foot"><span>github.com/KJM0424/travel-bill-wanted1</span><span>1 / 12</span></div>
+</section>
+
+<!-- 2. 문제 정의 -->
+<section class="slide" data-title="문제 정의">
+  <p class="kicker">1. 문제 정의</p>
+  <h2>여행이 끝나면 총무에게 일이 남는다</h2>
+  <div class="row" style="gap:32px;margin:auto 0">
+    <div class="card big grow"><h3>영수증을 옮겨 적는다</h3><p class="sub">영수증이 열 장 넘게 쌓인다.<br>가게·시각·금액을 손으로 옮긴다.</p></div>
+    <div class="card big grow"><h3>누가 빠졌는지 헷갈린다</h3><p class="sub">"카페엔 누가 빠졌더라?"<br>기억에 기대 1/N로 나눈다.</p></div>
+    <div class="card big grow"><h3>결제한 사람이 여럿이다</h3><p class="sub">숙소는 총무, 밥은 친구가 냈다.<br>누가 누구에게 얼마를 보내지?</p></div>
+  </div>
+  <div class="foot"><span>Travill</span><span>2 / 12</span></div>
+</section>
+
+<!-- 3. 서비스 소개 -->
+<section class="slide" data-title="서비스 소개">
+  <p class="kicker">2. 서비스 소개</p>
+  <h2>네 화면이면 끝난다</h2>
+  <div class="row" style="gap:56px;justify-content:space-between">
+    <div><div class="phone"><img src="img/setup.png" alt="설정 화면"></div><p class="shot-label">1 여행 정보</p><p class="shot-sub">사람, 총무, 정산 방식, 총무 계좌</p></div>
+    <div><div class="phone"><img src="img/review.png" alt="결제 내역 화면"></div><p class="shot-label">2·3 영수증 → 결제 내역</p><p class="shot-sub">AI가 읽고 날짜별로 정리. 눌러서 빠진 사람 빼기</p></div>
+    <div><div class="phone"><img src="img/transfers.png" alt="보낼 돈 화면"></div><p class="shot-label">4 보낼 돈</p><p class="shot-sub">송금 횟수가 적게 짝짓기. 메시지·계좌 복사</p></div>
+    <div><div class="phone"><img src="img/trip.png" alt="여행 돌아보기 화면"></div><p class="shot-label">여행 돌아보기</p><p class="shot-sub">날짜별 경로 지도, 다시 보기</p></div>
+  </div>
+  <div class="foot"><span>Travill</span><span>3 / 12</span></div>
+</section>
+
+<!-- 4. 시연 -->
+<section class="slide" data-title="시연">
+  <p class="kicker">2. 시연</p>
+  <h2>시연 영상</h2>
+  <div class="row" style="gap:80px;align-items:center;flex:1">
+    <div class="phone" style="width:380px"><img src="img/review-open.png" alt="결제를 펼쳐 함께한 사람을 고치는 화면" style="height:640px"></div>
+    <div class="grow">
+      <ol class="steps">
+        <li><span>1</span><div><b>올린다</b><p>영수증 6장과 풍경 사진 1장을 한 번에</p></div></li>
+        <li><span>2</span><div><b>걸러진다</b><p>풍경 사진은 "영수증이 아니어서 제외했어요"</p></div></li>
+        <li><span>3</span><div><b>고친다</b><p>AI가 잘못 읽은 금액을 결제 내역에서 바로잡기</p></div></li>
+        <li><span>4</span><div><b>뺀다</b><p>카페에 없던 친구를 이름만 눌러 빼기</p></div></li>
+        <li><span>5</span><div><b>보낸다</b><p>보낼 돈에서 송금 메시지와 계좌 복사</p></div></li>
+        <li><span>6</span><div><b>돌아본다</b><p>지도에서 자동차가 여행 경로를 다시 달리기</p></div></li>
+      </ol>
+      <p class="small" style="margin-top:32px">영상에서는 이 컴퓨터의 로컬 모델(Ollama)로 읽는다. 배포판은 Gemini API</p>
+    </div>
+  </div>
+  <div class="foot"><span>Travill</span><span>4 / 12</span></div>
+</section>
+
+<!-- 5. 구조 -->
+<section class="slide" data-title="구조">
+  <p class="kicker">3. 어떻게 동작하는가 · 구조</p>
+  <h2>화면과 계산을 나누고, AI는 갈아 끼운다</h2>
+  <div class="arch">
+    <div class="tier"><p class="tier-name">화면<small>app.py · ui/</small></p>
+      <div class="mods"><span>여행 정보</span><span>영수증 올리기</span><span>결제 내역</span><span>정산 결과</span><span>지도</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="tier core"><p class="tier-name">계산<small>core/ · streamlit을 모른다</small></p>
+      <div class="mods"><span class="key">인식기<em>Gemini · Ollama · Mock</em></span><span>결제 건 정리</span><span>정산</span><span>송금 메시지</span><span>위치·경로</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="tier"><p class="tier-name">바깥<small>호출은 core에서만</small></p>
+      <div class="mods"><span>Gemini API</span><span>Ollama (내 컴퓨터)</span><span>카카오 로컬 API</span></div></div>
+  </div>
+  <p class="small" style="margin-top:32px">모든 층이 같은 데이터 약속(Receipt · Expense · Trip)을 쓴다. 인식기는 같은 함수 모양이라 설정 한 줄로 바꾼다.</p>
+  <div class="foot"><span>테스트 401개 · TDD</span><span>5 / 12</span></div>
+</section>
+
+<!-- 6. 오류 처리 -->
+<section class="slide" data-title="오류 처리">
+  <p class="kicker">3. 어떻게 동작하는가 · 오류 처리</p>
+  <h2>실패해도 멈추지 않고, 무엇을 할지 알려 준다</h2>
+  <table>
+    <tr><th style="width:26%">상황</th><th style="width:38%">막는 방법</th><th>사용자에게 보이는 것</th></tr>
+    <tr><td><b>영수증이 아닌 사진·PDF</b></td><td>AI가 not_receipt로 판정, 확장자 확인</td><td class="sub">"영수증이 아니어서 제외했어요", "이미지 파일만 올릴 수 있어요"</td></tr>
+    <tr><td><b>AI 호출 실패</b></td><td>키·하루 한도·분당 한도·과부하·모델·연결·서버 7종으로 나눔. 하루 한도는 재시도 안 함</td><td class="sub">"오늘 쓸 수 있는 AI 횟수를 다 썼어요. 내일 다시 읽을 수 있어요."</td></tr>
+    <tr><td><b>13장이 같은 이유로 실패</b></td><td>같은 이유는 한 줄로 묶음</td><td class="sub">"a.jpg 외 12장: 읽지 못했어요 … 직접 추가할 수도 있어요"</td></tr>
+    <tr><td><b>한 장이 깨진 파일</b></td><td>3장씩 병렬, 실패한 장만 빼고 계속</td><td class="sub">나머지는 정상 인식</td></tr>
+    <tr><td><b>정산할 수 없는 결제</b></td><td>함께한 사람 0명·금액 0원이면 정산 전에 막음</td><td class="sub">"정산 전에 고칠 게 있어요" + 돌아가기</td></tr>
+    <tr><td><b>민감정보</b></td><td>카드번호 추출 안 함, 사진 저장 안 함, EXIF 제거, 오류에 키 안 섞음</td><td class="sub">업로드 화면 안내, 대화 기록에서 키 문자열 0회 확인</td></tr>
+  </table>
+  <div class="foot"><span>docs/stability.md</span><span>6 / 12</span></div>
+</section>
+
+<!-- 7. 설계 판단 -->
+<section class="slide" data-title="설계 판단">
+  <p class="kicker">3. 설계 판단과 맞바꾼 것</p>
+  <h2>정확함보다 빨리 고칠 수 있게</h2>
+  <div class="row" style="gap:32px">
+    <div class="card grow"><h3>결제 건마다 함께한 사람</h3><p class="sub">품목 단위로 나누면 정확하지만 입력이 길어진다. 결제 단위로 두고, 빠진 사람만 누르게 했다.</p><p class="small" style="margin-top:16px">맞바꾼 것: 한 결제 안의 메뉴별 분담</p></div>
+    <div class="card grow"><h3>AI는 읽기만, 사람이 확인</h3><p class="sub">AI가 틀릴 수 있다고 보고 모든 결제를 결제 내역에서 펼쳐 고칠 수 있게 했다.</p><p class="small" style="margin-top:16px">맞바꾼 것: 한 번 더 누르는 수고</p></div>
+    <div class="card grow"><h3>배포는 API, 테스트는 로컬</h3><p class="sub">배포판은 Gemini API로 읽는다. 테스트와 평가는 여러 번 돌려야 해서, 과금과 하루 한도가 걱정돼 내 맥북의 로컬 모델로 돌렸다.</p><p class="small" style="margin-top:16px">맞바꾼 것: 로컬은 장당 20~40초로 느리다</p></div>
+  </div>
+  <p style="margin-top:48px"><b>뺀 기능:</b> <span class="sub">해외 결제와 환율, 품목 단위 정산, 로그인·저장(대신 정산 파일 저장·불러오기), 사진 위치로 경로 추가</span></p>
+  <div class="foot"><span>docs/superpowers/specs</span><span>7 / 12</span></div>
+</section>
+
+<!-- 8. 평가 -->
+<section class="slide" data-title="평가">
+  <p class="kicker">4. 평가 리포트</p>
+  <h2>프롬프트 v2로 핵심 3필드 76.9% → 92.3%</h2>
+  <div class="row" style="gap:64px;align-items:flex-start">
+    <div class="card" style="width:900px;padding:40px 48px">
+      <div style="display:flex;gap:32px;font-size:22px;color:var(--sub);margin-bottom:16px">
+        <span><i style="display:inline-block;width:16px;height:16px;border-radius:4px;background:var(--v1);vertical-align:-2px;margin-right:8px"></i>v1 첫 지시문</span>
+        <span><i style="display:inline-block;width:16px;height:16px;border-radius:4px;background:var(--v2);vertical-align:-2px;margin-right:8px"></i>v2 고친 지시문</span>
+      </div>
+      <svg viewBox="0 0 800 420" width="800" height="420" role="img" aria-label="프롬프트 v1과 v2의 정확도 비교 막대 차트">
+        <g font-family="Pretendard, sans-serif" font-size="20" fill="#5B6572">
+          <line x1="0" y1="360" x2="800" y2="360" stroke="#E3E7E5"/>
+          <line x1="0" y1="60" x2="800" y2="60" stroke="#EEF1F0" stroke-dasharray="4 6"/>
+          <text x="0" y="50">100%</text>
+          <!-- 막대 높이 = 값 × 3px. 기준선 y=360 -->
+          <g>
+            <rect x="60" y="129" width="96" height="231" rx="6" fill="#6F95D8"><title>핵심 3필드 v1 76.9%</title></rect>
+            <rect x="160" y="83" width="96" height="277" rx="6" fill="#11875C"><title>핵심 3필드 v2 92.3%</title></rect>
+            <text x="108" y="117" text-anchor="middle" fill="#191F28" font-weight="700">76.9</text>
+            <text x="208" y="71" text-anchor="middle" fill="#191F28" font-weight="700">92.3</text>
+            <text x="158" y="396" text-anchor="middle" fill="#191F28" font-weight="600">핵심 3필드</text>
+          </g>
+          <g>
+            <rect x="320" y="83" width="96" height="277" rx="6" fill="#6F95D8"><title>결제 금액 v1 92.3%</title></rect>
+            <rect x="420" y="60" width="96" height="300" rx="6" fill="#11875C"><title>결제 금액 v2 100%</title></rect>
+            <text x="368" y="71" text-anchor="middle" fill="#191F28" font-weight="700">92.3</text>
+            <text x="468" y="48" text-anchor="middle" fill="#191F28" font-weight="700">100</text>
+            <text x="418" y="396" text-anchor="middle" fill="#191F28" font-weight="600">결제 금액</text>
+          </g>
+          <g>
+            <rect x="580" y="106" width="96" height="254" rx="6" fill="#6F95D8"><title>결제 일시 v1 84.6%</title></rect>
+            <rect x="680" y="83" width="96" height="277" rx="6" fill="#11875C"><title>결제 일시 v2 92.3%</title></rect>
+            <text x="628" y="94" text-anchor="middle" fill="#191F28" font-weight="700">84.6</text>
+            <text x="728" y="71" text-anchor="middle" fill="#191F28" font-weight="700">92.3</text>
+            <text x="678" y="396" text-anchor="middle" fill="#191F28" font-weight="600">결제 일시</text>
+          </g>
+        </g>
+      </svg>
+      <p class="small" style="margin-top:8px">생성 영수증 13장 · 로컬 qwen3-vl:8b-instruct · 핵심 3필드 = 상호·일시·금액 모두 정답</p>
+    </div>
+    <div class="grow">
+      <div class="card" style="padding:24px 32px;margin-bottom:32px;background:var(--primary-soft);box-shadow:none">
+        <p style="font-size:24px;line-height:1.5"><b>v1·v2란?</b> AI에게 "영수증을 이렇게 읽어라"라고 주는 지시문(프롬프트)이다. v1은 첫 버전, v2는 v1이 틀린 것을 보고 규칙 두 개를 더한 버전.</p>
+      </div>
+      <h3>v1이 틀린 이유 → v2에 더한 규칙</h3>
+      <ul class="plain" style="margin-bottom:40px">
+        <li>예약 캡처의 <b>체크인·대여 시각</b>을 결제 시각으로 읽음 → "결제일만 있으면 시각을 지어내지 않는다"</li>
+        <li>돌아간 영수증의 <b>과세물품가액</b>을 결제 금액으로 읽음 → "과세물품가액·부가세는 결제 금액이 아니다"</li>
+      </ul>
+      <h3>한계</h3>
+      <p class="small">13장뿐인 생성 이미지이고, 같은 이미지를 보고 고쳐 향상이 크게 보일 수 있다. 호텔 체크인 1건은 아직 틀린다. Gemini는 무료 하루 한도로 8장까지 재서 모두 정답.</p>
+    </div>
+  </div>
+  <div class="foot"><span>python -m eval.run_eval --prompt v1|v2 --source synthetic</span><span>8 / 12</span></div>
+</section>
+
+<!-- 9. AI 활용 -->
+<section class="slide" data-title="AI 활용">
+  <p class="kicker">5. AI 활용 과정</p>
+  <h2>규칙은 파일에, 판단은 사람이</h2>
+  <div class="row" style="gap:32px">
+    <div class="card grow">
+      <h3>CLAUDE.md</h3>
+      <p class="sub">core/는 streamlit을 import하지 않는다 · 키와 실물 영수증은 커밋하지 않는다 · 프롬프트를 바꾸면 ai-log에 적는다 · 새 기능은 실패하는 테스트부터</p>
+    </div>
+    <div class="card grow">
+      <h3>스킬</h3>
+      <p class="small">진행 순서</p>
+      <div class="chips"><span class="on">brainstorming</span><span class="on">writing-plans</span><span class="on">test-driven-development</span><span class="on">finishing-a-branch</span></div>
+      <p class="small" style="margin-top:16px">화면</p>
+      <div class="chips"><span>frontend-design</span><span>ui-ux-pro-max</span><span>developing-with-streamlit</span></div>
+      <p class="small" style="margin-top:16px">내 규칙</p>
+      <div class="chips"><span>git-workflow</span><span>python-convention</span><span>writing-rules</span></div>
+    </div>
+    <div class="card grow">
+      <h3>작업 방식</h3>
+      <p class="sub">Orca에서 기능마다 작업 공간(git worktree)을 따로 띄워 병렬 개발 · PR 26개 · "머지할 땐 계속 묻고 해"를 메모리에 저장해 매번 승인</p>
+    </div>
+  </div>
+  <div class="row" style="gap:32px;margin-top:40px">
+    <div class="grow"><p class="small"><span class="tag">AI가 한 일</span>설계 초안, 구현과 테스트, 리뷰, 화면 확인(내장 브라우저로 직접 조작·캡처), 문서</p></div>
+    <div class="grow"><p class="small"><span class="tag">사람이 정한 일</span>두 정산 방식, 결제별 참석자, 무료 모델, 토스 원칙의 디자인, 앱 이름, 머지 승인</p></div>
+  </div>
+  <div class="foot"><span>docs/ai-log.md · 프롬프트.md</span><span>9 / 12</span></div>
+</section>
+
+<!-- 10. AI 실수 -->
+<section class="slide" data-title="AI 실수">
+  <p class="kicker">5. AI가 틀렸고, 잡아서 고친 사례 (12건 중 3건)</p>
+  <h2>확인하지 않은 것은 틀릴 수 있다</h2>
+  <table>
+    <tr><th style="width:30%">AI가 틀린 것</th><th style="width:30%">어떻게 알았나</th><th>어떻게 고쳤나</th></tr>
+    <tr><td><b>없는 모델 이름</b><br><span class="sub" style="font-size:22px">계획의 gemini-2.5-flash를 확인 없이 씀</span></td><td>실제 키로 1장 시험 → 404 "no longer available"</td><td class="sub">쓸 수 있는 모델 4개를 같은 영수증으로 비교해 바꿈</td></tr>
+    <tr><td><b>유료 등급 전제의 비용 안내</b></td><td>14장을 올리다 429 반복, 오류 상세의 한도 종류 확인</td><td class="sub">무료 등급(하루 20회)으로 정정, 평가는 로컬 모델로</td></tr>
+    <tr><td><b>"줄 전체가 눌린다"고 보고</b><br><span class="sub" style="font-size:22px">실제로는 왼쪽 100px만 눌림</span></td><td><b>내가 직접 써 보다가</b> 화살표가 안 눌림</td><td class="sub">줄 위 네 지점을 실제로 눌러 원인 확인, 수정, 회귀 테스트</td></tr>
+  </table>
+  <p style="margin-top:40px;font-size:30px"><b>교훈:</b> <span class="sub">AI의 "됐다"는 근거가 아니다. 실제 키, 실제 클릭, 실패하는 테스트로 확인한다.</span></p>
+  <div class="foot"><span>docs/ai-log.md 6장</span><span>10 / 12</span></div>
+</section>
+
+<!-- 11. 회고 -->
+<section class="slide" data-title="회고">
+  <p class="kicker">6. 회고</p>
+  <h2>한계와 다음 단계</h2>
+  <div class="row" style="gap:32px">
+    <div class="card big grow">
+      <h3>한계</h3>
+      <ul class="plain">
+        <li>실물 영수증 없이 생성 영수증 13장으로만 평가</li>
+        <li>원화만, 품목 단위 정산 없음</li>
+        <li>새로고침하면 정산이 사라짐(파일로 저장·불러오기)</li>
+        <li>무료 Gemini 하루 20회</li>
+      </ul>
+    </div>
+    <div class="card big grow">
+      <h3>다음 단계</h3>
+      <ul class="plain">
+        <li>실물 영수증 25장으로 다시 평가</li>
+        <li>호텔 예약 캡처의 결제 시각 규칙(v3)</li>
+        <li>해외 결제와 환율</li>
+        <li>로그인과 저장(2차 프로젝트)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Travill</span><span>11 / 12</span></div>
+</section>
+
+<!-- 12. 마무리 -->
+<section class="slide" data-title="마무리">
+  <div class="row" style="flex:1;align-items:center;gap:120px">
+    <div class="grow">
+      <p class="kicker">Travill</p>
+      <h1>영수증은 AI가 읽고,<br>확인은 사람이 한다</h1>
+    </div>
+    <div class="card" style="width:760px">
+      <table style="font-size:26px">
+        <tr><td style="border-top:none;width:150px" class="sub">GitHub</td><td style="border-top:none;white-space:nowrap">github.com/KJM0424/travel-bill-wanted1</td></tr>
+        <tr><td class="sub">배포</td><td data-deploy>배포 주소</td></tr>
+        <tr><td class="sub">시연 영상</td><td>docs/demo/travill-demo.mp4</td></tr>
+        <tr><td class="sub">프롬프트</td><td>프롬프트.md</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="foot"><span>감사합니다</span><span>12 / 12</span></div>
+</section>
+
+</div>
+<div class="nav" aria-live="polite"></div>
+<script>
+  // ←/→, 스페이스, 클릭으로 넘긴다. 무대(1920×1080)를 창 크기에 맞춰 줄인다.
+  const slides = [...document.querySelectorAll(".slide")];
+  const nav = document.querySelector(".nav");
+  let index = Math.max(0, Math.min(slides.length - 1, parseInt(location.hash.slice(1) || "1", 10) - 1));
+  function fit() {
+    const scale = Math.min(innerWidth / 1920, innerHeight / 1080);
+    slides.forEach(s => (s.style.transform = `scale(${scale})`));
+  }
+  function show(i) {
+    index = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, n) => s.classList.toggle("active", n === index));
+    nav.textContent = `${index + 1} / ${slides.length} · ${slides[index].dataset.title}`;
+    history.replaceState(null, "", `#${index + 1}`);
+  }
+  addEventListener("keydown", e => {
+    if (["ArrowRight", "PageDown", " "].includes(e.key)) show(index + 1);
+    if (["ArrowLeft", "PageUp"].includes(e.key)) show(index - 1);
+  });
+  addEventListener("click", e => show(index + (e.clientX > innerWidth / 2 ? 1 : -1)));
+  addEventListener("resize", fit);
+  fit(); show(index);
+</script>
+</body>
+</html>
