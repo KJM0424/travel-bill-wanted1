@@ -49,6 +49,11 @@ b, strong { font-weight: 700; }
 .num { font-weight: 800; letter-spacing: -0.02em; }
 .tag { display: inline-block; font-size: 18px; font-weight: 600; color: var(--primary);
   background: var(--primary-soft); border-radius: 999px; padding: 6px 16px; margin-right: 8px; }
+ol.steps { list-style: none; display: grid; gap: 20px; }
+ol.steps li { display: grid; grid-template-columns: 48px 1fr; gap: 20px; align-items: center; }
+ol.steps li > span { width: 48px; height: 48px; border-radius: 50%; background: var(--primary-soft);
+  color: var(--primary); font-weight: 800; font-size: 22px; display: flex; align-items: center; justify-content: center; }
+ol.steps b { font-size: 26px; } ol.steps p { font-size: 22px; color: var(--sub); line-height: 1.4; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .chips span { white-space: nowrap; font-size: 19px; font-weight: 600; color: #333D4B; background: var(--fill);
   border-radius: 999px; padding: 6px 14px; }
@@ -78,6 +83,20 @@ b, strong { font-weight: 700; }
 .box.accent h4, .box.accent p { color: #FFFFFF; }
 .arrow { font-size: 32px; color: var(--weak); text-align: center; line-height: 1; }
 
+.arch { display: grid; gap: 12px; }
+.tier { display: grid; grid-template-columns: 300px 1fr; align-items: center; gap: 32px;
+  background: var(--surface); border-radius: 24px; box-shadow: var(--shadow); padding: 28px 32px; }
+.tier-name { font-size: 30px; font-weight: 750; }
+.tier-name small { display: block; font-size: 19px; font-weight: 500; color: var(--sub); margin-top: 4px; }
+.mods { display: flex; flex-wrap: wrap; gap: 12px; }
+.mods span { font-size: 22px; font-weight: 600; background: var(--fill); border-radius: 12px; padding: 14px 20px; }
+.mods span em { display: block; font-style: normal; font-size: 17px; font-weight: 500; color: var(--sub); margin-top: 2px; }
+.tier.core { background: var(--primary); }
+.tier.core .tier-name, .tier.core .tier-name small { color: #FFFFFF; }
+.tier.core .tier-name small { opacity: 0.8; }
+.tier.core .mods span { background: rgba(255, 255, 255, 0.14); color: #FFFFFF; }
+.tier.core .mods span em { color: rgba(255, 255, 255, 0.8); }
+
 /* 표 */
 table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 24px; }
 th { text-align: left; font-weight: 600; color: var(--sub); padding: 0 24px 16px 0; font-size: 20px; }
@@ -103,9 +122,9 @@ td.r, th.r { text-align: right; padding-right: 0; }
 <section class="slide" data-title="표지">
   <div class="row" style="flex:1;align-items:center;gap:120px">
     <div class="grow">
-      <p class="kicker">원티드 1차 프로젝트 · 개발</p>
+      <p class="kicker">Travill(트래빌) · 원티드 1차 프로젝트 · 개발</p>
       <h1>여행 정산,<br>영수증 사진으로 끝내요</h1>
-      <p class="sub" style="margin-top:32px;font-size:30px">Travill(트래빌): 영수증을 올리면 AI가 읽고, 결제마다 함께한 사람을 정해 송금까지 정리하는 앱</p>
+      <p class="sub" style="margin-top:32px;font-size:30px;white-space:nowrap">영수증을 올리면 AI가 읽고, 송금까지 정리해 주는 정산 앱</p>
     </div>
     <div class="slip" style="width:560px">
       <p style="font-size:24px;font-weight:600">제주 2박 3일 <span class="sub" style="font-weight:500;margin-left:12px">10.10 ~ 10.12</span></p>
@@ -125,12 +144,11 @@ td.r, th.r { text-align: right; padding-right: 0; }
 <section class="slide" data-title="문제 정의">
   <p class="kicker">1. 문제 정의</p>
   <h2>여행이 끝나면 총무에게 일이 남는다</h2>
-  <div class="row" style="gap:32px">
-    <div class="card grow"><h3>영수증을 옮겨 적는다</h3><p class="sub">2박 3일이면 영수증과 예약 캡처가 열 장이 넘는다. 상호·시각·금액을 하나씩 손으로 옮긴다.</p></div>
-    <div class="card grow"><h3>누가 빠졌는지 기억에 기댄다</h3><p class="sub">"첫날 카페엔 민호가 없었지?" 결제마다 함께한 사람이 달라 1/N이 맞지 않는다.</p></div>
-    <div class="card grow"><h3>결제한 사람이 여러 명이다</h3><p class="sub">숙소는 총무, 밥은 수아, 마트는 민호. 누가 누구에게 얼마를 보낼지 계산이 꼬인다.</p></div>
+  <div class="row" style="gap:32px;margin:auto 0">
+    <div class="card grow"><h3>영수증을 옮겨 적는다</h3><p class="sub">영수증이 열 장 넘게 쌓인다.<br>가게·시각·금액을 손으로 옮긴다.</p></div>
+    <div class="card grow"><h3>누가 빠졌는지 헷갈린다</h3><p class="sub">"카페엔 누가 빠졌더라?"<br>기억에 기대 1/N로 나눈다.</p></div>
+    <div class="card grow"><h3>결제한 사람이 여럿이다</h3><p class="sub">숙소는 총무, 밥은 친구가 냈다.<br>누가 누구에게 얼마를 보내지?</p></div>
   </div>
-  <p style="margin-top:56px;font-size:30px"><b>쓸 사람:</b> 친구·가족 여행의 총무. 회비를 걷는 여행과 각자 결제하고 나중에 나누는 여행 둘 다.</p>
   <div class="foot"><span>Travill</span><span>2 / 12</span></div>
 </section>
 
@@ -154,14 +172,15 @@ td.r, th.r { text-align: right; padding-right: 0; }
   <div class="row" style="gap:80px;align-items:center;flex:1">
     <div class="phone" style="width:380px"><img src="img/review-open.png" alt="결제를 펼쳐 함께한 사람을 고치는 화면" style="height:640px"></div>
     <div class="grow">
-      <ul class="plain">
-        <li>영수증 6장과 풍경 사진 1장을 한 번에 올린다</li>
-        <li>풍경 사진은 "영수증이 아니어서 제외했어요"</li>
-        <li>돌아간 영수증의 금액을 결제 내역에서 고친다</li>
-        <li>카페 결제에서 빠진 친구를 뺀다</li>
-        <li>보낼 돈 → 계좌 복사, 여행 돌아보기 → 다시 보기</li>
-      </ul>
-      <p class="small" style="margin-top:40px">영상: docs/demo/travill-demo.mp4 · 인식은 이 컴퓨터의 로컬 모델(Ollama), 배포판은 Gemini</p>
+      <ol class="steps">
+        <li><span>1</span><div><b>올린다</b><p>영수증 6장과 풍경 사진 1장을 한 번에</p></div></li>
+        <li><span>2</span><div><b>걸러진다</b><p>풍경 사진은 "영수증이 아니어서 제외했어요"</p></div></li>
+        <li><span>3</span><div><b>고친다</b><p>AI가 잘못 읽은 금액을 결제 내역에서 바로잡기</p></div></li>
+        <li><span>4</span><div><b>뺀다</b><p>카페에 없던 친구를 이름만 눌러 빼기</p></div></li>
+        <li><span>5</span><div><b>보낸다</b><p>보낼 돈에서 송금 메시지와 계좌 복사</p></div></li>
+        <li><span>6</span><div><b>돌아본다</b><p>지도에서 자동차가 여행 경로를 다시 달리기</p></div></li>
+      </ol>
+      <p class="small" style="margin-top:32px">영상에서는 이 컴퓨터의 로컬 모델(Ollama)로 읽는다. 배포판은 Gemini API</p>
     </div>
   </div>
   <div class="foot"><span>Travill</span><span>4 / 12</span></div>
@@ -171,20 +190,17 @@ td.r, th.r { text-align: right; padding-right: 0; }
 <section class="slide" data-title="구조">
   <p class="kicker">3. 어떻게 동작하는가 · 구조</p>
   <h2>화면과 계산을 나누고, AI는 갈아 끼운다</h2>
-  <div class="row" style="gap:48px;align-items:stretch">
-    <div class="layer" style="width:520px">
-      <div class="box"><h4>화면 · app.py, ui/</h4><p>단계별 화면, 세션 상태, 지도·복사 버튼</p></div>
-      <div class="arrow">↓</div>
-      <div class="box accent"><h4>계산 · core/</h4><p>streamlit을 모른다. 스키마·정산·송금 메시지·좌표·요약</p></div>
-      <div class="arrow">↓</div>
-      <div class="box"><h4>바깥 · AI, 카카오 로컬</h4><p>호출은 core의 클라이언트 한 곳에서만</p></div>
-    </div>
-    <div class="grow" style="display:grid;gap:24px;align-content:start">
-      <div class="card" style="padding:32px"><h3>인식기 3종, 같은 약속</h3><p class="sub"><code style="font-size:22px">recognize(image, prompt) → Receipt</code><br>Gemini(배포) · Ollama(로컬, 사진이 밖으로 안 나감) · Mock(화면 개발·테스트, 비용 0)</p></div>
-      <div class="card" style="padding:32px"><h3>공통 계약 하나</h3><p class="sub">Receipt·Expense·Trip(pydantic). AI 응답은 JSON 스키마로 강제하고 pydantic으로 다시 검증, 틀리면 1회 재시도</p></div>
-      <div class="card" style="padding:32px"><h3>정산 공식 하나</h3><p class="sub">사람마다 낸 돈 − 나눌 몫. 회비형은 "회비 지갑"을 가상 참여자로 두어 같은 공식으로 계산</p></div>
-    </div>
+  <div class="arch">
+    <div class="tier"><p class="tier-name">화면<small>app.py · ui/</small></p>
+      <div class="mods"><span>여행 정보</span><span>영수증 올리기</span><span>결제 내역</span><span>정산 결과</span><span>지도</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="tier core"><p class="tier-name">계산<small>core/ · streamlit을 모른다</small></p>
+      <div class="mods"><span class="key">인식기<em>Gemini · Ollama · Mock</em></span><span>결제 건 정리</span><span>정산</span><span>송금 메시지</span><span>위치·경로</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="tier"><p class="tier-name">바깥<small>호출은 core에서만</small></p>
+      <div class="mods"><span>Gemini API</span><span>Ollama (내 컴퓨터)</span><span>카카오 로컬 API</span></div></div>
   </div>
+  <p class="small" style="margin-top:32px">모든 층이 같은 데이터 약속(Receipt · Expense · Trip)을 쓴다. 인식기는 같은 함수 모양이라 설정 한 줄로 바꾼다.</p>
   <div class="foot"><span>테스트 401개 · TDD</span><span>5 / 12</span></div>
 </section>
 
@@ -211,7 +227,7 @@ td.r, th.r { text-align: right; padding-right: 0; }
   <div class="row" style="gap:32px">
     <div class="card grow"><h3>결제 건마다 함께한 사람</h3><p class="sub">품목 단위로 나누면 정확하지만 입력이 길어진다. 결제 단위로 두고, 빠진 사람만 누르게 했다.</p><p class="small" style="margin-top:16px">맞바꾼 것: 한 결제 안의 메뉴별 분담</p></div>
     <div class="card grow"><h3>AI는 읽기만, 사람이 확인</h3><p class="sub">AI가 틀릴 수 있다고 보고 모든 결제를 결제 내역에서 펼쳐 고칠 수 있게 했다.</p><p class="small" style="margin-top:16px">맞바꾼 것: 한 번 더 누르는 수고</p></div>
-    <div class="card grow"><h3>Gemini와 로컬 모델</h3><p class="sub">배포는 무료 Gemini, 시연·평가는 내 맥북의 qwen3-vl. 같은 약속이라 설정 한 줄로 바꾼다.</p><p class="small" style="margin-top:16px">맞바꾼 것: 무료 한도(하루 20회), 로컬은 장당 20초대</p></div>
+    <div class="card grow"><h3>배포는 API, 테스트는 로컬</h3><p class="sub">배포판은 Gemini API로 읽는다. 테스트와 평가는 여러 번 돌려야 해서, 과금과 하루 한도가 걱정돼 내 맥북의 로컬 모델로 돌렸다.</p><p class="small" style="margin-top:16px">맞바꾼 것: 로컬은 장당 20~40초로 느리다</p></div>
   </div>
   <p style="margin-top:48px"><b>뺀 기능:</b> <span class="sub">해외 결제와 환율, 품목 단위 정산, 로그인·저장(대신 정산 파일 저장·불러오기), 사진 위치로 경로 추가</span></p>
   <div class="foot"><span>docs/superpowers/specs</span><span>7 / 12</span></div>
@@ -224,8 +240,8 @@ td.r, th.r { text-align: right; padding-right: 0; }
   <div class="row" style="gap:64px;align-items:flex-start">
     <div class="card" style="width:900px;padding:40px 48px">
       <div style="display:flex;gap:32px;font-size:20px;color:var(--sub);margin-bottom:16px">
-        <span><i style="display:inline-block;width:16px;height:16px;border-radius:4px;background:var(--v1);vertical-align:-2px;margin-right:8px"></i>v1</span>
-        <span><i style="display:inline-block;width:16px;height:16px;border-radius:4px;background:var(--v2);vertical-align:-2px;margin-right:8px"></i>v2</span>
+        <span><i style="display:inline-block;width:16px;height:16px;border-radius:4px;background:var(--v1);vertical-align:-2px;margin-right:8px"></i>v1 첫 지시문</span>
+        <span><i style="display:inline-block;width:16px;height:16px;border-radius:4px;background:var(--v2);vertical-align:-2px;margin-right:8px"></i>v2 고친 지시문</span>
       </div>
       <svg viewBox="0 0 800 420" width="800" height="420" role="img" aria-label="프롬프트 v1과 v2의 정확도 비교 막대 차트">
         <g font-family="Pretendard, sans-serif" font-size="20" fill="#5B6572">
@@ -259,7 +275,10 @@ td.r, th.r { text-align: right; padding-right: 0; }
       <p class="small" style="margin-top:8px">생성 영수증 13장 · 로컬 qwen3-vl:8b-instruct · 핵심 3필드 = 상호·일시·금액 모두 정답</p>
     </div>
     <div class="grow">
-      <h3>v1이 틀린 이유 → v2 규칙</h3>
+      <div class="card" style="padding:24px 32px;margin-bottom:32px;background:var(--primary-soft);box-shadow:none">
+        <p style="font-size:22px;line-height:1.5"><b>v1·v2란?</b> AI에게 "영수증을 이렇게 읽어라"라고 주는 지시문(프롬프트)이다. v1은 첫 버전, v2는 v1이 틀린 것을 보고 규칙 두 개를 더한 버전.</p>
+      </div>
+      <h3>v1이 틀린 이유 → v2에 더한 규칙</h3>
       <ul class="plain" style="margin-bottom:40px">
         <li>예약 캡처의 <b>체크인·대여 시각</b>을 결제 시각으로 읽음 → "결제일만 있으면 시각을 지어내지 않는다"</li>
         <li>돌아간 영수증의 <b>과세물품가액</b>을 결제 금액으로 읽음 → "과세물품가액·부가세는 결제 금액이 아니다"</li>
