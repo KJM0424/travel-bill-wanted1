@@ -311,3 +311,17 @@ def test_rejects_out_of_range_or_non_finite_coordinates(x, y):
 def test_accepts_boundary_coordinates():
     s = fake_session({"address.json": {"documents": [{"x": "-180", "y": "90"}]}})
     assert geocode(mk(address="x"), "k", s) == (90.0, -180.0)
+
+
+def test_trip_known_coords_skip_request_and_still_anchor_keyword_search():
+    s = QuerySession({})
+    results = geocode_trip(
+        [trip_exp("e1", address="제주 애월 1"), trip_exp("e2", merchant="스타벅스")],
+        "k",
+        s,
+        known={"e1": (33.4, 126.3)},
+    )
+    assert results["e1"] == GeoResult(coords=(33.4, 126.3))
+    assert [c["params"] for c in s.calls] == [
+        {"query": "스타벅스", "x": "126.3", "y": "33.4", "radius": 20000}
+    ]

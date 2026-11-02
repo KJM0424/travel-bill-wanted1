@@ -46,22 +46,30 @@ def geocode(
 
 
 def geocode_trip(
-    expenses: list[Expense], api_key: str, session: requests.Session | None = None
+    expenses: list[Expense],
+    api_key: str,
+    session: requests.Session | None = None,
+    known: dict[str, Coords] | None = None,
 ) -> dict[str, GeoResult]:
     """지도에 올릴 결제만 expense_id별로 변환한다. expenses는 시간순으로 넘긴다.
 
     주소로 찾은 결제가 있으면, 주소가 없거나 못 찾은 결제의 상호명 검색은
     시간순으로 가장 가까운 '주소로 찾은 지점' 근처로 제한한다.
     흔한 상호명(예: 스타벅스)이 엉뚱한 지역을 찍는 일을 줄인다.
+    known(expense_id → 좌표)에 있는 건은 다시 조회하지 않고 기준 지점으로만 쓴다.
     모든 요청은 session 하나로 보낸다.
     """
+    known = known or {}
     api_key = api_key.strip()
     targets = [e for e in expenses if is_mappable(e)]
     if not api_key or not targets:
         return {}
     with _session_scope(session) as s:
         client = KakaoLocalClient(api_key, s)
-        by_address = [_search_address(client, e) for e in targets]
+        by_address = [
+            GeoResult(known[e.expense_id]) if e.expense_id in known else _search_address(client, e)
+            for e in targets
+        ]
         anchors = [(i, r.coords) for i, r in enumerate(by_address) if r.coords]
         results: dict[str, GeoResult] = {}
         for i, (expense, address) in enumerate(zip(targets, by_address, strict=True)):
