@@ -10,6 +10,14 @@ from ui.state import START_STEP, STEPS, go_to, recognizer_name, session
 
 # 휴대폰 한 손 화면 폭. 데스크톱에서도 이 폭으로 가운데에 둔다.
 COLUMN_WIDTH = 480
+# 위쪽 바 양옆 폭. 같게 두어야 가운데 화면 이름이 정말 가운데에 온다.
+APPBAR_SIDE = 104
+STEP_TITLES = {
+    "설정": "여행 정보",
+    "업로드": "영수증 올리기",
+    "검토": "결제 내역",
+    "정산": "정산 결과",
+}
 # 테마 설정(.streamlit/config.toml)으로 못 하는 것만 CSS로 한다. 우리가 붙인 key 클래스만 건드린다.
 # 색은 config.toml과 같은 값이다: 글자 #191F28, 보조 글자 #6B7684, 선 #E5E8EB, 강조 #17654C.
 COLUMN_CSS = """
@@ -22,6 +30,45 @@ COLUMN_CSS = """
 .st-key-page { font-variant-numeric: tabular-nums; }
 .st-key-page h1 { letter-spacing: -0.02em; line-height: 1.3; }
 .st-key-page h2 { letter-spacing: -0.02em; }
+
+/* 위쪽 바: 뒤로 아이콘, 가운데 화면 이름, 아래 진행 막대 */
+.st-key-appbar { min-height: 48px; }
+.st-key-appbar_title p { text-align: center; font-size: 17px; margin: 0; }
+/* Streamlit이 글자 칸 아래에 넣는 -16px 여백 때문에 이름·배지가 아이콘보다 내려가 보였다. */
+.st-key-appbar [data-testid="stMarkdownContainer"],
+.st-key-appbar [data-testid="stCaptionContainer"] { margin-bottom: 0 !important; }
+.st-key-appbar p { margin: 0 !important; }
+.st-key-nav_back button { min-width: 44px; min-height: 44px; padding: 0; justify-content: flex-start; }
+.st-key-nav_back button p {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+.tv-progress { display: flex; gap: 4px; margin: 0 0 6px; }
+.tv-progress i { flex: 1; height: 3px; border-radius: 2px; background: #E5E8EB; }
+.tv-progress i.on { background: #17654C; }
+
+/* 누를 때마다 Streamlit이 화면을 흐리게 다시 그린다. 앱처럼 그대로 두고 바뀐 곳만 바뀌게 한다. */
+[data-stale="true"] { opacity: 1 !important; transition: none !important; }
+
+/* 누르는 반응: 버튼·칩은 살짝 눌리고, 결제 줄은 바탕이 잠깐 진해진다. 펼친 칸은 부드럽게 나타난다. */
+.st-key-page button, .st-key-page_bottom button {
+  transition: transform 0.08s ease, background-color 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.st-key-page button:active, .st-key-page_bottom button:active { transform: scale(0.98); }
+[class*="st-key-rh_"]:active { background: #F2F4F6; }
+[class*="st-key-edit_"] { animation: tv-in 0.18s ease-out; }
+@keyframes tv-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .st-key-page button, .st-key-page_bottom button { transition: none; }
+  .st-key-page button:active, .st-key-page_bottom button:active { transform: none; }
+  [class*="st-key-edit_"] { animation: none; }
+}
+
+/* 아래 고정 버튼: 내용이 뒤로 지나갈 때 경계가 보이게, 아이폰 아래 여백만큼 띄운다. */
+[data-testid="stBottom"] > div { box-shadow: 0 -1px 0 #E5E8EB; background: #FFFFFF; }
+[data-testid="stBottomBlockContainer"] {
+  padding-top: 12px !important; padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+}
 
 /* 검토 화면: 은행 앱 거래 내역처럼 줄로 나눈 목록 */
 [class*="st-key-row_"] { padding: 14px 0 12px; border-bottom: 1px solid #E5E8EB; }
@@ -167,23 +214,43 @@ def demo_badge() -> None:
 
 
 def step_header(step: str) -> None:
-    """앱 상단 막대: 왼쪽 이전 버튼, 오른쪽 '2/4' 단계 표시."""
+    """앱 상단 막대: 왼쪽 뒤로 버튼, 가운데 화면 이름, 오른쪽 '2/4'. 아래에 진행 막대."""
     index = STEPS.index(step)
     previous = STEPS[index - 1] if index > 0 else START_STEP
     with st.container(
-        horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"
+        key="appbar",
+        horizontal=True,
+        horizontal_alignment="distribute",
+        vertical_alignment="center",
     ):
-        st.button(
-            "이전",
-            key="nav_back",
-            type="tertiary",
-            icon=":material/arrow_back_ios_new:",
-            on_click=go_to,
-            args=(previous,),
-        )
-        with st.container(horizontal=True, width="content", vertical_alignment="center"):
+        with st.container(width=APPBAR_SIDE):
+            # 글자는 CSS로 숨기고 아이콘만 보인다. 화면 읽기 프로그램은 "이전"으로 읽는다.
+            st.button(
+                "이전",
+                key="nav_back",
+                type="tertiary",
+                icon=":material/arrow_back_ios_new:",
+                on_click=go_to,
+                args=(previous,),
+            )
+        with st.container(key="appbar_title"):
+            st.markdown(f"**{STEP_TITLES[step]}**")
+        with st.container(
+            width=APPBAR_SIDE,
+            horizontal=True,
+            horizontal_alignment="right",
+            vertical_alignment="center",
+            gap="small",
+        ):
             demo_badge()
             st.caption(f"{index + 1}/{len(STEPS)}")
+    st.html(progress_html(index))
+
+
+def progress_html(index: int) -> str:
+    """단계 수만큼 칸을 나눈 얇은 막대. 지금 단계까지 칠한다."""
+    cells = "".join('<i class="on"></i>' if i <= index else "<i></i>" for i in range(len(STEPS)))
+    return f'<div class="tv-progress" aria-hidden="true">{cells}</div>'
 
 
 def bottom() -> DeltaGenerator:

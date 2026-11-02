@@ -172,8 +172,11 @@ def test_process_uploads_without_key_shows_korean_error(app_session, monkeypatch
 
 def test_upload_step_renders_notice_and_button(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[], step="업로드")
-    assert any("Gemini" in c.value for c in at.caption) or any("Gemini" in i.value for i in at.info)
     assert _has_button(at, "upload_manual")
+    # 체험 모드가 아니면 사진이 Gemini로 간다는 사실을 알린다. 화면을 그릴 때는 키를 쓰지 않는다.
+    monkeypatch.setenv("RECOGNIZER", "gemini")
+    at.run()
+    assert any("Gemini" in c.value for c in at.caption)
 
 
 # --- 검토 단계 (Task 13) ---
@@ -1154,3 +1157,48 @@ def test_route_map_refits_after_the_frame_gets_its_size():
     # 처음 맞춘 범위는 지도 칸 크기가 정해지기 전이라 한쪽으로 치우쳤다(3일차 성산·우도가 잘림).
     html = build_route_map([stop("흑돼지", 0), stop("우도", 2, 33.51, 126.95)]).get_root().render()
     assert "invalidateSize" in html and "fitBounds" in html and "126.95" in html
+
+
+# --- 앱처럼 다듬기: 위쪽 바, 진행 막대, 누르는 반응 ---
+
+
+@pytest.mark.parametrize(
+    ("step", "title"),
+    [
+        ("설정", "여행 정보"),
+        ("업로드", "영수증 올리기"),
+        ("검토", "결제 내역"),
+        ("정산", "정산 결과"),
+    ],
+)
+def test_app_bar_names_the_current_screen(monkeypatch, step, title):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step=step)
+    assert f"**{title}**" in [m.value for m in at.markdown]
+
+
+@pytest.mark.parametrize(("done", "on"), [(0, 1), (2, 3), (3, 4)])
+def test_progress_bar_fills_up_to_current_step(done, on):
+    from ui.layout import progress_html
+
+    html_text = progress_html(done)
+    assert html_text.count('class="on"') == on and html_text.count("<i") == 4
+
+
+def test_screen_does_not_dim_while_redrawing():
+    from ui.layout import COLUMN_CSS
+
+    assert '[data-stale="true"]' in COLUMN_CSS and "opacity: 1 !important" in COLUMN_CSS
+
+
+def test_tap_feedback_respects_reduced_motion():
+    from ui.layout import COLUMN_CSS
+
+    assert ":active" in COLUMN_CSS and "prefers-reduced-motion" in COLUMN_CSS
+
+
+def test_demo_mode_upload_notice_says_no_ai_is_called(monkeypatch):
+    from ui.upload_step import MOCK_DATA_NOTICE
+
+    at = open_app_with_trip(monkeypatch, expenses=[], step="업로드")
+    assert MOCK_DATA_NOTICE in [c.value for c in at.caption]
+    assert "Gemini" not in MOCK_DATA_NOTICE
