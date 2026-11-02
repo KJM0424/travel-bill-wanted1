@@ -38,7 +38,7 @@ def font(size: int, weight: int = 0) -> ImageFont.FreeTypeFont:
 def parse_script(path: Path) -> dict[str, dict]:
     """'## 장면 | 카드 제목 | 카드 설명' 다음 줄이 읽을 문장이다."""
     scenes = {}
-    for block in re.split(r"^## ", path.read_text(encoding="utf-8"), flags=re.M)[1:]:
+    for block in re.split(r"^## ", path.read_text(encoding="utf-8"), flags=re.MULTILINE)[1:]:
         head, *body = block.strip().splitlines()
         name, title, desc = (part.strip() for part in head.split("|"))
         scenes[name] = {
