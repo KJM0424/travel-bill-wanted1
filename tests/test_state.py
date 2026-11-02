@@ -46,7 +46,7 @@ def test_sync_members_drops_payout_of_removed_member():
 def test_validation_messages_strip_pydantic_prefix():
     with pytest.raises(ValidationError) as info:
         sync_members(trip_with([]), ["A", "A"], leader="A")
-    assert validation_messages(info.value) == ["참석자 이름이 중복됩니다: A"]
+    assert validation_messages(info.value) == ["참석자 이름이 중복돼요: A"]
 
 
 def test_validation_messages_hide_english_type_errors():

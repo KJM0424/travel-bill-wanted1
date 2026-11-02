@@ -31,7 +31,7 @@ def recognize_batch(
 ) -> list[RecognitionOutcome]:
     """결과는 입력 순서대로 돌려준다. cache는 원본 이미지 해시 → 인식 결과다."""
     if len(files) > MAX_FILES:
-        raise ValueError(f"한 번에 최대 {MAX_FILES}장까지 올릴 수 있습니다.")
+        raise ValueError(f"한 번에 최대 {MAX_FILES}장까지 올릴 수 있어요.")
     outcomes: list[RecognitionOutcome | None] = [None] * len(files)
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {

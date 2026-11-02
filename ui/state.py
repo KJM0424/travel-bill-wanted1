@@ -116,7 +116,7 @@ def validation_messages(error: ValidationError) -> list[str]:
             messages.append(item["msg"].removeprefix("Value error, "))
         else:
             field = FIELD_LABELS.get(str(item["loc"][0]) if item["loc"] else "", "입력")
-            messages.append(f"{field} 값이 올바르지 않습니다.")
+            messages.append(f"{field} 값이 올바르지 않아요.")
     return list(dict.fromkeys(messages))
 
 
@@ -133,5 +133,5 @@ def get_recognizer() -> Recognizer:
 
     api_key = get_setting("GEMINI_API_KEY")
     if not api_key:
-        raise RecognitionError("Gemini API 키가 설정되지 않았습니다.")
+        raise RecognitionError("Gemini API 키가 설정되지 않았어요.")
     return GeminiRecognizer(api_key=api_key, model=get_setting("GEMINI_MODEL") or DEFAULT_MODEL)

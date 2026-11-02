@@ -14,8 +14,8 @@ DEFAULT_MODEL = "gemini-2.5-flash"
 HTTP_TIMEOUT_MS = 60_000
 # 잠시 기다리면 풀리는 오류: 호출 한도 초과(429), 서버 과부하(503)
 RETRY_MESSAGES = {
-    429: "AI 호출 한도를 넘었습니다. 잠시 후 다시 시도하세요.",
-    503: "AI 서버가 응답하지 않습니다. 잠시 후 다시 시도하세요.",
+    429: "AI 호출 한도를 넘었어요. 잠시 후 다시 시도해 주세요.",
+    503: "AI 서버가 응답하지 않아요. 잠시 후 다시 시도해 주세요.",
 }
 FORMAT_RETRIES = 1
 
@@ -30,7 +30,7 @@ class GeminiRecognizer:
         max_rate_retries: int = 3,
     ):
         if not api_key:
-            raise RecognitionError("Gemini API 키가 설정되지 않았습니다.")
+            raise RecognitionError("Gemini API 키가 설정되지 않았어요.")
         self._api_key = api_key
         self._model = model
         self._client = client or genai.Client(
@@ -54,7 +54,7 @@ class GeminiRecognizer:
                 return Receipt.model_validate_json(text or "")
             except ValidationError:
                 if attempt == FORMAT_RETRIES:
-                    raise RecognitionError("AI 응답 형식이 올바르지 않습니다.") from None
+                    raise RecognitionError("AI 응답 형식이 올바르지 않아요.") from None
         raise AssertionError("unreachable")
 
     def _generate(self, contents: list, config: types.GenerateContentConfig) -> str | None:

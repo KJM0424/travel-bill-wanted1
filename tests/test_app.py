@@ -296,7 +296,7 @@ def test_result_blocked_when_not_ready(monkeypatch):
 
 def test_result_blocked_when_participants_empty(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(1000, "A", [])], step="정산")
-    assert any("참석자가 없습니다" in e.value for e in at.error) and not at.exception
+    assert any("참석자가 없어요" in e.value for e in at.error) and not at.exception
 
 
 def test_result_errors_distinguish_same_merchant(monkeypatch):
@@ -404,7 +404,7 @@ def test_review_date_change_resorts_expenses(monkeypatch):
 
 
 def test_load_trip_file_clears_previous_upload_notices(app_session):
-    app_session["upload_notices"] = ["a.png: 영수증이 아니어서 제외했습니다."]
+    app_session["upload_notices"] = ["a.png: 영수증이 아니어서 제외했어요."]
     app_session["upload_error"] = "오류"
     app_session["upload_added"] = 2
     assert load_trip_file(export_trip(prepaid_trip_with_expenses())) is None

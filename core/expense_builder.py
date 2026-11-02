@@ -23,14 +23,14 @@ def build_expenses(
     for outcome in outcomes:
         receipt = outcome.receipt
         if receipt is None:
-            notes.append(f"{outcome.filename}: 인식 실패({outcome.error}). 수동으로 추가하세요.")
+            notes.append(f"{outcome.filename}: 인식 실패({outcome.error}). 직접 추가해 주세요.")
             continue
         if receipt.doc_type == "not_receipt":
-            notes.append(f"{outcome.filename}: 영수증이 아니어서 제외했습니다.")
+            notes.append(f"{outcome.filename}: 영수증이 아니어서 제외했어요.")
             continue
         if receipt.currency != "KRW":
             notes.append(
-                f"{outcome.filename}: 원화(KRW)가 아닌 결제({receipt.currency})라서 제외했습니다."
+                f"{outcome.filename}: 원화(KRW)가 아닌 결제({receipt.currency})라서 제외했어요."
             )
             continue
         expense_id = _unique_id(outcome.image_hash[:12], used_ids)
@@ -50,12 +50,12 @@ def _unique_id(base: str, used: set[str]) -> str:
 def _to_expense(receipt: Receipt, expense_id: str, digest: str, trip: Trip) -> Expense:
     warnings = list(receipt.warnings)
     if receipt.total_amount is None:
-        warnings.append("금액을 인식하지 못했습니다. 직접 입력하세요.")
+        warnings.append("금액을 인식하지 못했어요. 직접 입력해 주세요.")
     if not receipt.merchant_name:
-        warnings.append("상호를 인식하지 못했습니다.")
+        warnings.append("상호를 인식하지 못했어요.")
     paid_at, time_known = parse_paid_at(receipt.paid_at)
     if receipt.paid_at and paid_at is None:
-        warnings.append(f"결제 일시를 해석하지 못했습니다: {receipt.paid_at}")
+        warnings.append(f"결제 일시를 해석하지 못했어요: {receipt.paid_at}")
     if paid_at is not None:
         paid_at, date_warnings = _check_trip_dates(paid_at, trip)
         warnings.extend(date_warnings)
@@ -84,8 +84,8 @@ def _check_trip_dates(paid_at: datetime, trip: Trip) -> tuple[datetime, list[str
     except ValueError:  # 2월 29일
         corrected = None
     if corrected and paid_at.year != corrected.year and _in_trip(corrected.date(), trip):
-        return corrected, [f"연도를 {paid_at.year}년에서 {corrected.year}년으로 고쳤습니다."]
-    return paid_at, ["결제 날짜가 여행 기간 밖입니다."]
+        return corrected, [f"연도를 {paid_at.year}년에서 {corrected.year}년으로 고쳤어요."]
+    return paid_at, ["결제 날짜가 여행 기간 밖이에요."]
 
 
 def _in_trip(day: date, trip: Trip) -> bool:
