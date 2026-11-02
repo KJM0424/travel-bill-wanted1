@@ -1,22 +1,57 @@
-"""정산 결과 아래 여행 경로 지도: 결제 순서대로 번호 마커와 움직이는 선."""
+"""정산 결과 아래 '여행 돌아보기': 요약 카드, 날짜별 색 경로 지도, 다시 보기, 날짜별 동선."""
 
 import html
+import json
 import time
+from dataclasses import dataclass
+from datetime import date, datetime
+from itertools import pairwise
 
 import folium
 import streamlit as st
+from branca.element import MacroElement, Template
 from folium.plugins import AntPath
 from streamlit_folium import st_folium
 
 from core.config import get_setting
 from core.expense_builder import sort_expenses
 from core.geocode import GeoResult, geocode_trip, is_mappable
-from core.schema import Expense, Trip
+from core.payment_message import format_won
+from core.schema import Category, Expense, Trip
+from core.trip_story import TripStats, group_days, route_km, summarize_trip
 from ui.state import session
 
-# .streamlit/config.toml의 primaryColor와 같은 값이다.
-ROUTE_COLOR = "#17654C"
+# 1일차는 .streamlit/config.toml의 primaryColor(여권 초록)다. 지도 바탕(OSM) 위에서 서로 구분되는 색만 골랐다.
+DAY_COLORS = ["#17654C", "#3166D6", "#E0662B", "#8350D4", "#D2386C", "#0E7C86"]
+UNKNOWN_DAY_COLOR = "#8B95A1"
+# 날짜가 바뀌는 구간은 회색 점선으로 잇는다.
+DAY_JUMP_STYLE = {"color": "#8B95A1", "weight": 3, "dash_array": "6 8", "opacity": 0.9}
 MAP_HEIGHT = 450
+ALL_DAYS = "전체"
+DAY_KEY = "map_day"
+REPLAY_LABEL = "여행 다시 보기"
+REPLAY_STEP_MS = 700
+# folium이 기본으로 불러오는 Font Awesome 6 아이콘 이름이다.
+CATEGORY_ICONS: dict[Category, str] = {
+    "food": "fa-utensils",
+    "cafe": "fa-mug-hot",
+    "lodging": "fa-bed",
+    "transport": "fa-car",
+    "shopping": "fa-bag-shopping",
+    "activity": "fa-ticket",
+    "etc": "fa-receipt",
+}
+CATEGORY_NAMES: dict[Category, str] = {
+    "food": "식비",
+    "cafe": "카페",
+    "lodging": "숙소",
+    "transport": "교통",
+    "shopping": "쇼핑",
+    "activity": "놀거리",
+    "etc": "기타",
+}
+# 분류 비율 막대는 큰 순서로 여권 초록을 옅게 칠한다. 지도의 날짜 색과 겹치면 같은 색이 두 뜻이 된다.
+SHARE_COLORS = ["#17654C", "#3F8A6F", "#6DAA92", "#9CC8B6", "#C7E1D6", "#DDE9E4", "#EEF5F1"]
 GEO_CACHE_KEY = "geo_cache"
 # 화면은 버튼을 누를 때마다 다시 그려진다. 못 찾은 결과를 세션 내내 붙잡지도,
 # 다시 그릴 때마다 카카오를 다시 부르지도 않도록 정해 둔 시간 동안만 재사용한다.
@@ -27,10 +62,99 @@ NO_KEY_INFO = (
 )
 LOAD_ERROR = "위치를 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요."
 MARKER_HTML = (
-    '<div style="width:26px;height:26px;border-radius:50%;background:{color};color:#fff;'
-    "border:2px solid #fff;font:700 13px/22px Pretendard,sans-serif;text-align:center;"
-    'box-shadow:0 0 0 1px {color};">{number}</div>'
+    '<div style="width:30px;height:30px;border-radius:50%;background:{color};color:#fff;'
+    "border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);display:flex;"
+    'align-items:center;justify-content:center;font-size:13px;">'
+    '<i class="fa-solid {icon}"></i></div>'
 )
+POPUP_HTML = (
+    '<div style="font:14px/1.5 Pretendard,sans-serif;color:#191F28;min-width:150px">'
+    '<b style="font-size:15px">{name}</b><br>'
+    '<span style="color:#6B7684">{when}</span><br>'
+    "<b>{amount}</b><br>"
+    '<span style="color:#6B7684">함께: {people}</span></div>'
+)
+
+
+@dataclass(frozen=True)
+class Stop:
+    """지도에 찍을 결제 한 건. day는 날짜 색 번호(0부터)이고, -1이면 날짜를 모른다."""
+
+    name: str
+    lat: float
+    lng: float
+    day: int
+    category: Category
+    when: str
+    amount: int
+    people: str
+
+
+class _Replay(MacroElement):
+    """'여행 다시 보기' 버튼. 누르면 경로를 지우고 결제 순서대로 마커와 선을 하나씩 다시 그린다.
+
+    folium 기본 플러그인(TimestampedGeoJson)은 실제 시간 단위로 움직여 빈 시간대가 길고
+    외부 스크립트를 여러 개 더 불러와서, Leaflet만으로 직접 만든다.
+    """
+
+    _template = Template("""
+{% macro script(this, kwargs) %}
+(function () {
+  var map = {{ this._parent.get_name() }};
+  var route = {{ this.route.get_name() }};
+  var markers = [{{ this.marker_names }}];
+  var coords = {{ this.coords }};
+  var legs = {{ this.legs }};
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var stepMs = reduce ? 0 : {{ this.step_ms }};
+  var timer = null, layer = null;
+  function reset() {
+    clearTimeout(timer);
+    if (layer) { map.removeLayer(layer); layer = null; }
+    if (!map.hasLayer(route)) { map.addLayer(route); }
+  }
+  function play() {
+    reset();
+    map.removeLayer(route);
+    layer = L.layerGroup().addTo(map);
+    var i = 0;
+    (function step() {
+      if (i > 0) { L.polyline([coords[i - 1], coords[i]], legs[i]).addTo(layer); }
+      markers[i].addTo(layer);
+      i += 1;
+      timer = setTimeout(i < markers.length ? step : reset, i < markers.length ? stepMs : 1500);
+    })();
+  }
+  var Button = L.Control.extend({
+    options: { position: "topright" },
+    onAdd: function () {
+      var b = L.DomUtil.create("button");
+      b.type = "button";
+      b.textContent = "\u25b6 {{ this.label }}";
+      b.style.cssText = "background:#17654C;color:#fff;border:0;border-radius:999px;" +
+        "padding:8px 14px;font:600 14px Pretendard,sans-serif;cursor:pointer;" +
+        "box-shadow:0 1px 4px rgba(0,0,0,.3);min-height:36px";
+      L.DomEvent.disableClickPropagation(b);
+      L.DomEvent.on(b, "click", play);
+      return b;
+    }
+  });
+  new Button().addTo(map);
+})();
+{% endmacro %}
+""")
+
+    def __init__(self, route: folium.FeatureGroup, markers: list[folium.Marker], stops: list[Stop]):
+        super().__init__()
+        self._name = "Replay"
+        self.route = route
+        self.marker_names = ", ".join(m.get_name() for m in markers)
+        self.coords = json.dumps([[s.lat, s.lng] for s in stops])
+        legs = [None] + [_leg_style(a, b) for a, b in pairwise(stops)]
+        self.legs = json.dumps(legs)
+        self.step_ms = REPLAY_STEP_MS
+        self.label = REPLAY_LABEL
+
 
 now = time.monotonic
 
@@ -44,24 +168,55 @@ def _safe_text(text: str) -> str:
     return html.escape(text).replace("`", "&#96;").replace("$", "&#36;")
 
 
-def build_route_map(points: list[tuple[str, float, float]]) -> folium.Map:
-    """(이름, lat, lng)를 시간순으로 받아 번호 마커와 AntPath 경로를 그린다."""
-    m = folium.Map(location=[points[0][1], points[0][2]], zoom_start=12, tiles="OpenStreetMap")
-    for number, (name, lat, lng) in enumerate(points, start=1):
-        folium.Marker(
-            [lat, lng],
-            tooltip=_safe_text(f"{number}. {name}"),
-            icon=folium.DivIcon(
-                html=MARKER_HTML.format(color=ROUTE_COLOR, number=number),
-                icon_size=(26, 26),
-                icon_anchor=(13, 13),
-            ),
-        ).add_to(m)
-    if len(points) > 1:
-        locations = [[lat, lng] for _, lat, lng in points]
-        AntPath(locations, color=ROUTE_COLOR, pulse_color="#FFFFFF", weight=4, delay=1200).add_to(m)
-        m.fit_bounds(locations, padding=(30, 30))
+def day_color(day: int) -> str:
+    return UNKNOWN_DAY_COLOR if day < 0 else DAY_COLORS[day % len(DAY_COLORS)]
+
+
+def _leg_style(a: Stop, b: Stop) -> dict:
+    # Leaflet 옵션 이름 그대로다(다시 보기 스크립트가 L.polyline에 넘긴다).
+    if a.day != b.day:
+        return {"color": DAY_JUMP_STYLE["color"], "weight": 3, "dashArray": "6 8"}
+    return {"color": day_color(b.day), "weight": 4}
+
+
+def build_route_map(stops: list[Stop]) -> folium.Map:
+    """시간순 결제를 날짜별 색 경로로 그린다. 같은 날은 움직이는 선, 날짜가 바뀌면 회색 점선."""
+    m = folium.Map(location=[stops[0].lat, stops[0].lng], zoom_start=13, tiles="OpenStreetMap")
+    route = folium.FeatureGroup(name="route", control=False).add_to(m)
+    markers = [_marker(s).add_to(route) for s in stops]
+    for a, b in pairwise(stops):
+        if a.day != b.day:
+            folium.PolyLine([[a.lat, a.lng], [b.lat, b.lng]], **DAY_JUMP_STYLE).add_to(route)
+    for day in dict.fromkeys(s.day for s in stops):
+        same_day = [[s.lat, s.lng] for s in stops if s.day == day]
+        if len(same_day) > 1:
+            color = day_color(day)
+            AntPath(same_day, color=color, pulse_color="#FFFFFF", weight=4, delay=1200).add_to(
+                route
+            )
+    if len(stops) > 1:
+        m.fit_bounds([[s.lat, s.lng] for s in stops], padding=(30, 30))
+        _Replay(route, markers, stops).add_to(m)
     return m
+
+
+def _marker(stop: Stop) -> folium.Marker:
+    popup = POPUP_HTML.format(
+        name=_safe_text(stop.name),
+        when=_safe_text(stop.when or "시간 모름"),
+        amount=format_won(stop.amount),
+        people=_safe_text(stop.people),
+    )
+    return folium.Marker(
+        [stop.lat, stop.lng],
+        tooltip=_safe_text(stop.name),
+        popup=folium.Popup(popup, max_width=240),
+        icon=folium.DivIcon(
+            html=MARKER_HTML.format(color=day_color(stop.day), icon=CATEGORY_ICONS[stop.category]),
+            icon_size=(30, 30),
+            icon_anchor=(15, 15),
+        ),
+    )
 
 
 def _places(expenses: list[Expense]) -> list[list[str]]:
@@ -95,39 +250,165 @@ def locate(expenses: list[Expense], api_key: str) -> dict[str, GeoResult]:
 
 
 def render_map(trip: Trip) -> None:
-    expenses = [e for e in sort_expenses(trip.expenses) if is_mappable(e)]
-    if not expenses:
+    active = [e for e in trip.expenses if not e.excluded]
+    if not active:
         return
-    st.subheader("여행 경로", anchor=False)
-    api_key = kakao_api_key()
-    if not api_key:
-        st.info(NO_KEY_INFO)
-        return
-    with st.spinner("결제한 곳을 지도에 찍고 있어요"):
-        results = locate(expenses, api_key)
-    failed = [e for e in expenses if results[e.expense_id].failed]
-    if len(failed) == len(expenses):
-        # 키 오류·한도 초과·네트워크 문제. 주소가 틀려서 못 찾은 것과 구분한다.
-        st.warning(LOAD_ERROR)
-        return
-    found = [(e, results[e.expense_id].coords) for e in expenses if results[e.expense_id].coords]
-    if found:
-        st.caption("결제한 순서대로 번호를 붙였어요.")
-        points = [(e.merchant_name, lat, lng) for e, (lat, lng) in found]
+    st.subheader("여행 돌아보기", anchor=False)
+    # 위치 조회가 끝나야 이동 거리를 알 수 있다. 자리를 먼저 잡고 나중에 채운다.
+    card = st.container()
+    days = group_days(active)
+    tags = {day: day_tag(day, trip) for day, _ in days}
+    places = [e for e in sort_expenses(active) if is_mappable(e)]
+    results = _locate_places(places)
+    found = [(e, results[e.expense_id].coords) for e in places if e.expense_id in results]
+    found = [(e, c) for e, c in found if c]
+    km = route_km([c for _, c in found]) if len(found) > 1 else None
+    card.html(story_html(summarize_trip(trip), km))
+
+    place_days = [day for day, group in days if any(is_mappable(e) for e in group)]
+    picked = _pick_day([tags[d] for d in place_days])
+    shown_days = [d for d in place_days if picked in (ALL_DAYS, tags[d])]
+    stops = [
+        _stop(e, c, day_index(_day_of(e), trip), trip) for e, c in found if _day_of(e) in shown_days
+    ]
+    if stops:
         st_folium(
-            build_route_map(points),
+            build_route_map(stops),
             height=MAP_HEIGHT,
             use_container_width=True,
             returned_objects=[],
-            key="route_map",
+            key=f"route_map_{picked}",
         )
+    for day, group in days:
+        if day in shown_days:
+            _render_day_line(tags[day], day_index(day, trip), group)
+    if results:
+        _caption_unresolved(places, results)
+
+
+def day_index(day: date | None, trip: Trip) -> int:
+    """날짜 색 번호. 1일차가 0이고, 여행 기간 밖이거나 날짜를 모르면 -1(회색)이다."""
+    if day is None or not trip.start_date <= day <= trip.end_date:
+        return -1
+    return (day - trip.start_date).days
+
+
+def day_tag(day: date | None, trip: Trip) -> str:
+    """여행 기간 안이면 'n일차', 밖이면(미리 결제한 숙소 등) 날짜, 모르면 '날짜 모름'."""
+    if day is None:
+        return "날짜 모름"
+    if trip.start_date <= day <= trip.end_date:
+        return f"{(day - trip.start_date).days + 1}일차"
+    return f"{day.month}월 {day.day}일"
+
+
+def story_html(stats: TripStats, km: float | None) -> str:
+    """여행 요약 카드. 상호명은 AI가 읽었거나 사용자가 고친 값이라 이스케이프한다."""
+    if stats.length_label == "당일치기":
+        head = f"당일치기 여행에서 {stats.count}번 결제했어요"
+    else:
+        head = f"{stats.length_label} 동안 {stats.count}번 결제했어요"
+    rows = []
+    if km is not None:
+        distance = f"{km:.1f}" if km < 10 else f"{km:,.0f}"
+        rows.append(("이동 거리", f"약 {distance}km", "들른 곳 사이 직선거리"))
+    if stats.busiest_day:
+        day, amount = stats.busiest_day
+        rows.append(("가장 많이 쓴 날", format_won(amount), f"{day.month}월 {day.day}일"))
+    if stats.biggest:
+        name, amount = stats.biggest
+        rows.append(("가장 큰 결제", format_won(amount), name))
+    items = "".join(
+        f"<dt>{label}</dt><dd>{value}<small>{html.escape(note)}</small></dd>"
+        for label, value, note in rows
+    )
+    shades = [SHARE_COLORS[min(i, len(SHARE_COLORS) - 1)] for i in range(len(stats.shares))]
+    bar = "".join(
+        f'<span style="width:{pct}%;background:{shade}"></span>'
+        for (_, pct), shade in zip(stats.shares, shades, strict=True)
+    )
+    legend = "".join(
+        f'<li><i style="background:{shade}"></i>{CATEGORY_NAMES[c]} {pct}%</li>'
+        for (c, pct), shade in zip(stats.shares, shades, strict=True)
+    )
+    return (
+        f'<div class="tv-story"><p class="tv-story-head">{head}</p><dl>{items}</dl>'
+        f'<div class="tv-bar" aria-hidden="true">{bar}</div><ul class="tv-legend">{legend}</ul></div>'
+    )
+
+
+def _locate_places(places: list[Expense]) -> dict[str, GeoResult]:
+    """키가 없거나 모두 실패하면 안내만 하고 빈 결과를 돌려준다."""
+    if not places:
+        return {}
+    api_key = kakao_api_key()
+    if not api_key:
+        st.info(NO_KEY_INFO)
+        return {}
+    with st.spinner("결제한 곳을 지도에 찍고 있어요"):
+        results = locate(places, api_key)
+    if all(results[e.expense_id].failed for e in places):
+        # 키 오류·한도 초과·네트워크 문제. 주소가 틀려서 못 찾은 것과 구분한다.
+        st.warning(LOAD_ERROR)
+        return {}
+    return results
+
+
+def _pick_day(tags: list[str]) -> str:
+    if len(tags) < 2:
+        return ALL_DAYS
+    options = [ALL_DAYS, *tags]
+    # 결제를 고쳐 그 날짜가 사라졌으면 고른 값을 버린다. 없는 값을 넘기면 위젯이 오류를 낸다.
+    if session().get(DAY_KEY) not in (None, *options):
+        del session()[DAY_KEY]
+    picked = st.pills("날짜", options, default=ALL_DAYS, key=DAY_KEY, label_visibility="collapsed")
+    return picked or ALL_DAYS
+
+
+def _render_day_line(tag: str, color_index: int, group: list[Expense]) -> None:
+    names = " → ".join(html.escape(e.merchant_name) for e in group if is_mappable(e))
+    total = format_won(sum(e.amount for e in group))
+    dot = f'<span style="color:{day_color(color_index)}">●</span>'
+    st.markdown(
+        f"{dot} **{tag}** &nbsp;{total}  \n{names}",
+        unsafe_allow_html=True,
+    )
+
+
+def _caption_unresolved(places: list[Expense], results: dict[str, GeoResult]) -> None:
+    failed = [e for e in places if results[e.expense_id].failed]
     not_found = [
-        e for e in expenses if not results[e.expense_id].coords and not results[e.expense_id].failed
+        e for e in places if not results[e.expense_id].coords and not results[e.expense_id].failed
     ]
     if not_found:
         st.caption(f"위치를 찾지 못한 결제: {_names(not_found)}")
     if failed:
         st.caption(f"위치를 불러오지 못한 결제: {_names(failed)}")
+
+
+def _day_of(expense: Expense) -> date | None:
+    return expense.paid_at.date() if expense.paid_at else None
+
+
+def _stop(expense: Expense, coords: tuple[float, float], day: int, trip: Trip) -> Stop:
+    everyone = sorted(expense.participants) == sorted(trip.members)
+    return Stop(
+        name=expense.merchant_name,
+        lat=coords[0],
+        lng=coords[1],
+        day=day,
+        category=expense.category,
+        when=_when(expense.paid_at, expense.time_known),
+        amount=expense.amount,
+        people="모두" if everyone else ", ".join(expense.participants),
+    )
+
+
+def _when(paid_at: datetime | None, time_known: bool) -> str:
+    if paid_at is None:
+        return ""
+    text = f"{paid_at.month}월 {paid_at.day}일"
+    return f"{text} {paid_at:%H:%M}" if time_known else text
 
 
 def _names(expenses: list[Expense]) -> str:

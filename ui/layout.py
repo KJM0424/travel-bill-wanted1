@@ -67,6 +67,29 @@ COLUMN_CSS = """
 .tv-slip dt { color: #6B7684; }
 .tv-slip dd { margin: 0; text-align: right; font-weight: 600; }
 
+/* 여행 돌아보기 요약 카드: 정산 영수증과 구분되게 흰 바탕에 테두리만 둔다. */
+.tv-story { border: 1px solid #E5E8EB; border-radius: 16px; padding: 18px 20px; margin-bottom: 12px; }
+.tv-story .tv-story-head { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 12px; }
+.st-key-page .tv-story dl {
+  display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; margin: 0 0 16px; padding: 0;
+  font-size: 15px;
+}
+.st-key-page .tv-story dt, .st-key-page .tv-story dd { margin: 0; padding: 0; }
+.tv-story dt { color: #6B7684; }
+.tv-story dd { text-align: right; font-weight: 600; }
+.tv-story dd small {
+  display: block; color: #6B7684; font-weight: 500; font-size: 13px; word-break: keep-all;
+}
+.tv-story .tv-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; gap: 2px; }
+.tv-story .tv-legend {
+  list-style: none; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 10px 0 0; padding: 0;
+  font-size: 13px; color: #4E5968;
+}
+.st-key-page .tv-story .tv-legend li { margin: 0; padding: 0; }
+.tv-story .tv-legend i {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px;
+}
+
 /* 업로드 칸: Streamlit 기본 영어 문구("Upload", "200MB per file")를 한국어로 바꾸고 칸을 크게 한다. */
 .st-key-upload_box [data-testid="stFileUploaderDropzone"] {
   flex-direction: column; justify-content: center; align-items: center; gap: 8px;
