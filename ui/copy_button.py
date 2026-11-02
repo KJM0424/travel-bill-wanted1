@@ -11,8 +11,9 @@ _CSS = """
   font: inherit;
   font-weight: 600;
   color: var(--st-primary-color);
-  background: var(--st-background-color);
-  border: 1px solid var(--st-border-color);
+  /* 흰 카드 위에서 눌러도 되는 버튼으로 보이게 연한 초록 바탕(ui/layout.py의 --tv-primary-soft). */
+  background: var(--tv-primary-soft, #E7F1EC);
+  border: none;
   border-radius: var(--st-button-radius);
   cursor: pointer;
 }

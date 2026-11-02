@@ -7,6 +7,7 @@ import streamlit as st
 from core.config import get_setting
 from ui.branding import PAGE_TITLE
 from ui.layout import apply_column_css, bottom_button, column, render_flashes, step_header
+from ui.pwa import inject_pwa_head
 from ui.result_step import render_result
 from ui.review_step import render_review
 from ui.setup_step import render_setup
@@ -50,6 +51,7 @@ def render_step(step: str) -> None:
 def main() -> None:
     st.set_page_config(page_title=PAGE_TITLE, page_icon=":material/receipt_long:")
     apply_column_css()
+    inject_pwa_head()
     with column():
         if not check_password():
             return

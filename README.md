@@ -30,6 +30,9 @@ AI 호출 없이 검토·정산·여행 돌아보기를 바로 보여 주려면 
 - 결제자는 재민·수아·민호가 나눠 냈고, 첫날 카페에는 민호가 빠졌다. 총무 재민의 계좌(예시 번호)가 들어 있다.
 - 영수증 설정(`eval/synthetic_specs.json`)을 바꾸면 `python -m eval.make_synthetic --font <ttf>` 뒤에 `python -m eval.make_demo_trip`으로 다시 만든다. 둘이 어긋나면 테스트가 실패한다.
 
+### 휴대폰에서 앱처럼 쓰기
+휴대폰 브라우저의 "홈 화면에 추가"를 쓰면 주소창 없이 앱처럼 열린다(`static/manifest.json`). 배포판(Streamlit Community Cloud)은 앱을 틀(iframe) 안에 넣어 보여 줘서 적용되지 않을 수 있다.
+
 ## 설정 값
 로컬은 `.env`, 배포는 Streamlit Secrets에서 읽는다(`core/config.py`). 빈 값은 없는 것으로 본다.
 
