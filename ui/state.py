@@ -125,9 +125,16 @@ def recognizer_name() -> str:
 
 
 def get_recognizer() -> Recognizer:
-    """RECOGNIZER가 mock이면 Mock, 아니면 Gemini. 키가 없으면 RecognitionError."""
+    """RECOGNIZER가 mock이면 Mock, ollama면 로컬 모델, 아니면 Gemini. 키가 없으면 RecognitionError."""
     if recognizer_name() == "mock":
         return MockRecognizer()
+    if recognizer_name() == "ollama":
+        from core.recognizer.ollama import DEFAULT_HOST, DEFAULT_MODEL, OllamaRecognizer
+
+        return OllamaRecognizer(
+            model=get_setting("OLLAMA_MODEL") or DEFAULT_MODEL,
+            host=get_setting("OLLAMA_HOST") or DEFAULT_HOST,
+        )
     # google-genai import가 무거워서 Gemini를 쓸 때만 불러온다.
     from core.recognizer.gemini import DEFAULT_MODEL, GeminiRecognizer
 
