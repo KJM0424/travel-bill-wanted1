@@ -1,7 +1,7 @@
 # 시연 영상 대본
 
 `scripts/record_demo.py`가 앱을 조작하며 장면마다 시각을 남긴다(`marks.json`). 그 뒤 `scripts/make_demo_video.py`가 이 대본으로 다음을 만들어 영상을 완성한다.
-- 음성: macOS `say -v Yuna`로 읽힌다.
+- 음성: Microsoft 신경망 음성 현수(`ko-KR-HyunsuMultilingualNeural`, edge-tts)로 읽힌다. `--tts say`면 macOS Yuna.
 - 오른쪽 설명 카드: 장면 이름과 설명을 보여 준다.
 - 화면 아래 자막: 음성과 같은 문장을 보여 준다.
 

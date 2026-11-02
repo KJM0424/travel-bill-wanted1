@@ -2,15 +2,18 @@
 
 - 화면: 1920×1080. 왼쪽에 휴대폰 화면, 오른쪽에 장면 설명 카드, 아래에 자막
 - 인식을 기다리는 구간만 빨리 감고, 배수를 카드에 적는다
-- 음성: macOS `say -v Yuna`. 음성이 장면보다 길면 그 장면의 마지막 화면을 잠시 멈춰 맞춘다
+- 음성: Microsoft 신경망 음성(edge-tts, 기본 ko-KR-HyunsuMultilingualNeural) 또는 macOS `say -v Yuna`.
+  음성이 장면보다 길면 그 장면의 마지막 화면을 잠시 멈춰 맞춘다
 
 이 ffmpeg에는 자막·글자 필터(libass, drawtext)가 없어, 글자는 Pillow로 그린 PNG를 겹친다.
-    python scripts/make_demo_video.py --raw docs/demo/raw --out docs/demo/travill-demo.mp4
+    python scripts/make_demo_video.py --raw docs/demo/raw --out docs/demo/travill-demo.mp4 \
+        --edge-tts videoenv/bin/edge-tts   # edge-tts는 대본을 Microsoft 서버로 보낸다. --tts say면 오프라인
 """
 
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -27,8 +30,21 @@ BG = (243, 245, 244)
 INK, SUB, PRIMARY, SOFT = (25, 31, 40), (91, 101, 114), (23, 101, 76), (231, 241, 236)
 FAST_SCENE = "인식 중"
 FAST_TARGET_S = 9.0
-VOICE = ["say", "-v", "Yuna", "-r", "185"]
+EDGE_VOICE = "ko-KR-HyunsuMultilingualNeural"
+SAY_VOICE = ["say", "-v", "Yuna", "-r", "185"]
 TAIL_S = 0.6  # 음성이 끝난 뒤 다음 장면까지 쉬는 시간
+
+
+def speak(text: str, out_base: Path, tts: str, edge_tts: str) -> Path:
+    """대본 한 줄을 음성 파일로 만든다."""
+    if tts == "edge":
+        out = out_base.with_suffix(".mp3")
+        cmd = [edge_tts, "--voice", EDGE_VOICE, "--text", text, "--write-media", str(out)]
+        subprocess.run(cmd, check=True, capture_output=True)
+    else:
+        out = out_base.with_suffix(".aiff")
+        subprocess.run([*SAY_VOICE, "-o", str(out), text], check=True)
+    return out
 
 
 def font(size: int, weight: int = 0) -> ImageFont.FreeTypeFont:
@@ -124,7 +140,7 @@ def frame_png(out: Path, phone_w: int) -> None:
     im.save(out)
 
 
-def build(raw_dir: Path, out_path: Path) -> None:
+def build(raw_dir: Path, out_path: Path, tts: str, edge_tts: str) -> None:
     raw = raw_dir / "raw.webm"
     marks = json.loads((raw_dir / "marks.json").read_text(encoding="utf-8"))
     scenes = parse_script(SCRIPT)
@@ -137,8 +153,7 @@ def build(raw_dir: Path, out_path: Path) -> None:
         end = marks[i + 1]["t"] if i + 1 < len(marks) else total_raw
         scene = scenes[mark["scene"]]
         speed = max(1.0, (end - start) / FAST_TARGET_S) if mark["scene"] == FAST_SCENE else 1.0
-        voice = work / f"v{i:02d}.aiff"
-        subprocess.run([*VOICE, "-o", str(voice), scene["say"]], check=True)
+        voice = speak(scene["say"], work / f"v{i:02d}", tts, edge_tts)
         spoken = duration(voice)
         length = (end - start) / speed
         hold = max(0.0, spoken + TAIL_S - length)
@@ -234,8 +249,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="시연 영상 편집")
     parser.add_argument("--raw", type=Path, default=ROOT / "docs/demo/raw")
     parser.add_argument("--out", type=Path, default=ROOT / "docs/demo/travill-demo.mp4")
+    parser.add_argument(
+        "--tts", choices=["edge", "say"], default="edge", help="edge: 신경망 음성, say: macOS"
+    )
+    parser.add_argument(
+        "--edge-tts", default=shutil.which("edge-tts") or "edge-tts", help="edge-tts 실행 파일"
+    )
     args = parser.parse_args()
-    build(args.raw, args.out)
+    build(args.raw, args.out, args.tts, args.edge_tts)
 
 
 if __name__ == "__main__":
