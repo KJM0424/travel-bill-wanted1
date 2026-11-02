@@ -4,6 +4,7 @@ import pytest
 
 from core.schema import Expense, Trip
 from core.trip_story import (
+    curve_points,
     group_days,
     haversine_km,
     route_km,
@@ -137,3 +138,29 @@ def test_summarize_empty_trip_has_no_highlights():
     stats = summarize_trip(make_trip([]))
     assert stats.count == 0 and stats.total == 0
     assert stats.busiest_day is None and stats.biggest is None and stats.shares == []
+
+
+def test_curve_starts_and_ends_at_the_two_points():
+    a, b = (33.46, 126.31), (33.25, 126.41)
+    points = curve_points(a, b, steps=20)
+    assert len(points) == 21
+    assert points[0] == a and points[-1] == b
+
+
+def test_curve_bends_away_from_the_straight_line():
+    a, b = (33.0, 126.0), (33.0, 127.0)
+    middle = curve_points(a, b, steps=20)[10]
+    straight_middle = (33.0, 126.5)
+    assert haversine_km(middle, straight_middle) > 5
+    assert middle[1] == pytest.approx(126.5, abs=0.01)
+
+
+def test_curve_back_and_forth_does_not_overlap():
+    a, b = (33.0, 126.0), (33.0, 127.0)
+    there = curve_points(a, b, steps=20)[10]
+    back = curve_points(b, a, steps=20)[10]
+    assert haversine_km(there, back) > 10
+
+
+def test_curve_between_same_point_is_just_that_point():
+    assert curve_points((33.5, 126.5), (33.5, 126.5)) == [(33.5, 126.5), (33.5, 126.5)]

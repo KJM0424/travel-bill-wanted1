@@ -38,6 +38,29 @@ def route_km(points: list[Coords]) -> float:
     return sum(haversine_km(a, b) for a, b in pairwise(points))
 
 
+def curve_points(a: Coords, b: Coords, bend: float = 0.18, steps: int = 24) -> list[Coords]:
+    """a에서 b로 가는 완만한 곡선(2차 베지어)의 점들. 양 끝은 a, b 그대로다.
+
+    가는 방향의 오른쪽으로 휜다. 그래서 갔다가 돌아오는 길은 서로 겹치지 않는다.
+    위도 1도와 경도 1도의 길이가 달라서, 경도에 cos(위도)를 곱한 평면에서 계산한다.
+    """
+    if a == b:
+        return [a, b]
+    scale = math.cos(math.radians((a[0] + b[0]) / 2))
+    ax, ay, bx, by = a[1] * scale, a[0], b[1] * scale, b[0]
+    dx, dy = bx - ax, by - ay
+    # 진행 방향 (dx, dy)의 오른쪽 수직 방향은 (dy, -dx)다.
+    cx, cy = (ax + bx) / 2 + dy * bend, (ay + by) / 2 - dx * bend
+    points = []
+    for i in range(steps + 1):
+        t = i / steps
+        x = (1 - t) ** 2 * ax + 2 * (1 - t) * t * cx + t**2 * bx
+        y = (1 - t) ** 2 * ay + 2 * (1 - t) * t * cy + t**2 * by
+        points.append((y, x / scale))
+    points[0], points[-1] = a, b
+    return points
+
+
 def trip_length_label(start: date, end: date) -> str:
     days = (end - start).days + 1
     return "당일치기" if days <= 1 else f"{days - 1}박 {days}일"
