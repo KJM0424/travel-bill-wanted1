@@ -572,19 +572,18 @@ class FakeGeocoder:
     def __init__(self, results: dict[str, GeoResult]):
         self.results = results
         self.asked: list[list[str]] = []
-        self.known: list[dict] = []
 
-    def __call__(self, expenses, api_key, session=None, known=None):
-        known = known or {}
-        self.asked.append([e.expense_id for e in expenses if e.expense_id not in known])
-        self.known.append(dict(known))
-        return {
-            e.expense_id: GeoResult(known[e.expense_id])
-            if e.expense_id in known
-            else self.results[e.expense_id]
-            for e in expenses
-            if map_view.is_mappable(e)
-        }
+    def __call__(self, expenses, api_key, session=None):
+        self.asked.append([e.expense_id for e in expenses])
+        return {e.expense_id: self.results[e.expense_id] for e in expenses}
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.value = 1000.0
+
+    def __call__(self) -> float:
+        return self.value
 
 
 def open_map(monkeypatch, expenses: list[Expense], results: dict[str, GeoResult], key: str = "k"):
@@ -628,24 +627,59 @@ def test_render_map_all_lookups_failed_shows_load_error(monkeypatch):
     assert "위치를 찾지 못한 결제" not in all_text(at)
 
 
-def test_render_map_caches_found_coords_only(monkeypatch):
+def test_route_map_escapes_merchant_names():
+    hostile = "a`b${document.title=1}<img src=x onerror=alert(2)>"
+    html = build_route_map([(hostile, 33.4, 126.3)]).get_root().render()
+    assert hostile not in html and "<img src=x" not in html and "${document" not in html
+
+
+def test_render_map_partial_failure_lists_both_kinds(monkeypatch):
     expenses = [place("e1", "흑돼지", 12), place("e2", "없는가게", 15)]
-    results = {"e1": GeoResult((33.4, 126.3)), "e2": GeoResult(None)}
-    at, fake = open_map(monkeypatch, expenses, results)
-    cache = at.session_state["geo_cache"]
-    assert set(cache) == {"e1"}
-    at.run()
-    # 찾은 건은 다시 묻지 않고 기준 지점으로만 넘기고, 못 찾은 건은 다시 묻는다.
-    assert fake.asked[-1] == ["e2"] and fake.known[-1] == {"e1": (33.4, 126.3)}
+    results = {"e1": GeoResult(None, failed=True), "e2": GeoResult(None)}
+    at, _ = open_map(monkeypatch, expenses, results)
+    assert not at.warning
+    text = all_text(at)
+    assert "위치를 찾지 못한 결제: 없는가게" in text and "위치를 불러오지 못한 결제: 흑돼지" in text
 
 
-def test_render_map_requeries_when_address_changes(monkeypatch):
+def test_render_map_reuses_results_until_places_change(monkeypatch):
     at, fake = open_map(monkeypatch, [place("e1", "흑돼지", 12)], {"e1": GeoResult((33.4, 126.3))})
+    at.run()
+    assert len(fake.asked) == 1
     trip = at.session_state["trip"]
     moved = trip.expenses[0].model_copy(update={"merchant_address": "제주 서귀포시 1"})
     at.session_state["trip"] = trip.model_copy(update={"expenses": [moved]})
     at.run()
-    assert fake.asked[-1] == ["e1"]
+    assert len(fake.asked) == 2
+
+
+@pytest.mark.parametrize(
+    ("result", "wait"),
+    [
+        (GeoResult(None, failed=True), map_view.RETRY_FAILED_SECONDS),
+        (GeoResult(None), map_view.RETRY_NOT_FOUND_SECONDS),
+    ],
+)
+def test_render_map_retries_unresolved_only_after_wait(monkeypatch, result, wait):
+    clock = Clock()
+    monkeypatch.setattr(map_view, "now", clock)
+    expenses = [place("e1", "흑돼지", 12), place("e2", "카페", 15)]
+    at, fake = open_map(monkeypatch, expenses, {"e1": GeoResult((33.4, 126.3)), "e2": result})
+    clock.value += wait - 1
+    at.run()
+    assert len(fake.asked) == 1
+    clock.value += 2
+    at.run()
+    assert len(fake.asked) == 2
+
+
+def test_render_map_found_results_never_expire(monkeypatch):
+    clock = Clock()
+    monkeypatch.setattr(map_view, "now", clock)
+    at, fake = open_map(monkeypatch, [place("e1", "흑돼지", 12)], {"e1": GeoResult((33.4, 126.3))})
+    clock.value += 10**6
+    at.run()
+    assert len(fake.asked) == 1
 
 
 def test_render_map_skips_transport_and_manual(monkeypatch):

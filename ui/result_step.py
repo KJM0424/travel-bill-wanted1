@@ -59,7 +59,6 @@ def render_result() -> None:
     _render_transfers(plan_transfers(balances), trip)
     with st.expander("자세히 보기"):
         _render_table(balances, trip)
-    render_map(trip)
     bottom().download_button(
         "정산 파일 저장하기",
         export_trip(trip),
@@ -71,6 +70,8 @@ def render_result() -> None:
         icon=":material/download:",
         help="저장한 파일은 시작 화면에서 다시 불러와 이어서 고칠 수 있어요.",
     )
+    # 위치 조회가 느려도 저장 버튼이 먼저 보이도록 맨 마지막에 그린다(버튼은 화면 아래 고정이다).
+    render_map(trip)
 
 
 def _render_people(balances: list[Balance], trip: Trip) -> None:
