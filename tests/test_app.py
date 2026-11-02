@@ -1,5 +1,5 @@
 import io
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 from PIL import Image
@@ -10,7 +10,7 @@ from core.geocode import GeoResult
 from core.schema import FUND_WALLET, Expense
 from tests.ui_helpers import APP_PATH, exp, fill_setup, open_app, open_app_with_trip, trip_with
 from ui import map_view, state
-from ui.map_view import build_route_map
+from ui.map_view import Stop, build_route_map, story_html
 from ui.result_step import export_trip, import_trip
 from ui.review_step import add_manual_expense, expense_labels
 from ui.setup_step import load_trip_file
@@ -656,11 +656,41 @@ def all_text(at: AppTest) -> str:
     return " ".join(e.value for e in elements)
 
 
-def test_route_map_has_antpath_and_numbered_markers():
-    m = build_route_map([("흑돼지", 33.4, 126.3), ("카페", 33.5, 126.5)])
-    html = m.get_root().render()
-    assert "antPath" in html and "1. 흑돼지" in html and "2. 카페" in html
-    assert "#17654C" in html
+def stop(name: str, day: int, lat: float = 33.4, lng: float = 126.3, **kwargs) -> Stop:
+    fields = {"category": "food", "when": "10월 10일 12:00", "amount": 30000, "people": "모두"}
+    return Stop(name=name, lat=lat, lng=lng, day=day, **(fields | kwargs))
+
+
+def test_route_map_colors_each_day_and_uses_category_icons():
+    stops = [
+        stop("흑돼지", 0),
+        stop("카페", 0, 33.5, 126.5, category="cafe"),
+        stop("호텔", 1, 33.25, 126.4, category="lodging"),
+    ]
+    html = build_route_map(stops).get_root().render()
+    assert "antPath" in html
+    assert map_view.DAY_COLORS[0] in html and map_view.DAY_COLORS[1] in html
+    assert "fa-utensils" in html and "fa-mug-hot" in html and "fa-bed" in html
+
+
+def test_route_map_joins_days_with_dashed_line():
+    html = build_route_map([stop("흑돼지", 0), stop("호텔", 1, 33.25, 126.4)]).get_root().render()
+    assert '"dashArray": "6 8"' in html
+
+
+def test_route_map_popup_shows_time_amount_and_people():
+    html = build_route_map([stop("흑돼지", 0, people="A, B")]).get_root().render()
+    assert "10월 10일 12:00" in html and "30,000원" in html and "A, B" in html
+
+
+def test_route_map_has_replay_button():
+    html = build_route_map([stop("흑돼지", 0), stop("카페", 0, 33.5, 126.5)]).get_root().render()
+    assert map_view.REPLAY_LABEL in html
+
+
+def test_route_map_single_stop_has_no_replay():
+    html = build_route_map([stop("흑돼지", 0)]).get_root().render()
+    assert map_view.REPLAY_LABEL not in html
 
 
 def test_render_map_without_key_shows_info(monkeypatch):
@@ -687,7 +717,7 @@ def test_render_map_all_lookups_failed_shows_load_error(monkeypatch):
 
 def test_route_map_escapes_merchant_names():
     hostile = "a`b${document.title=1}<img src=x onerror=alert(2)>"
-    html = build_route_map([(hostile, 33.4, 126.3)]).get_root().render()
+    html = build_route_map([stop(hostile, 0, people=hostile)]).get_root().render()
     assert hostile not in html and "<img src=x" not in html and "${document" not in html
 
 
@@ -760,3 +790,117 @@ def test_result_summary_counts_only_included_and_escapes_name():
     html_text = summary_html(trip)
     assert "30,000원" in html_text and "1건" in html_text and "10,000원" in html_text
     assert "<b>제주</b>" not in html_text and "&lt;b&gt;" in html_text
+
+
+# --- 여행 돌아보기 ---
+
+
+def visit(id: str, merchant: str, day: int, hour: int, **kwargs) -> Expense:
+    return place(id, merchant, hour, **kwargs).model_copy(
+        update={"paid_at": datetime(2026, 10, 9 + day, hour)}
+    )
+
+
+def two_day_trip() -> list[Expense]:
+    return [
+        visit("e1", "고기국수", 1, 12),
+        visit("e2", "카페", 1, 15, category="cafe"),
+        visit("e3", "생선구이", 2, 19),
+    ]
+
+
+TWO_DAY_COORDS = {
+    "e1": GeoResult((33.46, 126.31)),
+    "e2": GeoResult((33.47, 126.33)),
+    "e3": GeoResult((33.25, 126.41)),
+}
+
+
+def test_story_html_shows_trip_numbers():
+    from core.trip_story import TripStats
+
+    stats = TripStats(
+        "2박 3일",
+        13,
+        1200000,
+        (date(2026, 10, 11), 256000),
+        ("<b>생선</b>", 96000),
+        [("food", 60), ("lodging", 40)],
+    )
+    text = story_html(stats, 186.4)
+    assert "2박 3일" in text and "13번" in text and "약 186km" in text
+    assert "10월 11일" in text and "256,000원" in text and "96,000원" in text
+    assert "식비 60%" in text and "숙소 40%" in text
+    assert "<b>생선</b>" not in text and "&lt;b&gt;" in text
+
+
+def test_story_html_without_distance_skips_distance_row():
+    from core.trip_story import TripStats
+
+    stats = TripStats("당일치기", 1, 10000, None, ("국수", 10000), [("food", 100)])
+    assert "이동 거리" not in story_html(stats, None)
+
+
+def test_story_card_shows_even_without_kakao_key(monkeypatch):
+    at, _ = open_map(monkeypatch, two_day_trip(), {}, key="")
+    assert any("2박 3일" in h.value for h in at.get("html"))
+    assert any("카카오" in i.value for i in at.info)
+
+
+def test_story_card_includes_distance_when_located(monkeypatch):
+    at, _ = open_map(monkeypatch, two_day_trip(), TWO_DAY_COORDS)
+    assert any("이동 거리" in h.value for h in at.get("html"))
+
+
+def test_day_pills_list_trip_days(monkeypatch):
+    at, _ = open_map(monkeypatch, two_day_trip(), TWO_DAY_COORDS)
+    assert at.pills(key="map_day").options == ["전체", "1일차", "2일차"]
+
+
+def test_timeline_lists_each_day_in_order(monkeypatch):
+    at, _ = open_map(monkeypatch, two_day_trip(), TWO_DAY_COORDS)
+    text = all_text(at)
+    assert "고기국수 → 카페" in text and "생선구이" in text
+    assert "20,000원" in text
+
+
+def test_picking_a_day_draws_only_that_day(monkeypatch):
+    drawn: list[list[str]] = []
+    real = map_view.build_route_map
+
+    def spy(stops):
+        drawn.append([s.name for s in stops])
+        return real(stops)
+
+    monkeypatch.setattr(map_view, "build_route_map", spy)
+    at, _ = open_map(monkeypatch, two_day_trip(), TWO_DAY_COORDS)
+    assert drawn[-1] == ["고기국수", "카페", "생선구이"]
+    at.pills(key="map_day").set_value("2일차").run()
+    assert drawn[-1] == ["생선구이"]
+    assert "고기국수" not in all_text(at)
+
+
+def test_day_outside_trip_is_labeled_by_date(monkeypatch):
+    early = visit("e0", "숙소 예약", 1, 9, category="lodging").model_copy(
+        update={"paid_at": datetime(2026, 9, 28, 9)}
+    )
+    coords = TWO_DAY_COORDS | {"e0": GeoResult((33.5, 126.5))}
+    at, _ = open_map(monkeypatch, [early, *two_day_trip()], coords)
+    assert at.pills(key="map_day").options == ["전체", "9월 28일", "1일차", "2일차"]
+
+
+@pytest.mark.parametrize(
+    ("day", "index"),
+    [(date(2026, 10, 10), 0), (date(2026, 10, 12), 2), (date(2026, 9, 28), -1), (None, -1)],
+)
+def test_day_index_counts_from_trip_start_and_greys_out_other_days(day, index):
+    assert map_view.day_index(day, trip_with([])) == index
+
+
+def test_story_bar_uses_its_own_shades_not_day_colors():
+    from core.trip_story import TripStats
+
+    stats = TripStats("2박 3일", 2, 20000, None, None, [("lodging", 60), ("food", 40)])
+    text = story_html(stats, None)
+    assert map_view.SHARE_COLORS[0] in text and map_view.SHARE_COLORS[1] in text
+    assert not any(color in text for color in map_view.DAY_COLORS[1:])
