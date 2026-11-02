@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from core.payment_message import BANKS, clean_account_number, match_bank, split_old_account
 from core.schema import PayoutInfo, Trip
+from core.trip_story import trip_length_label
 from ui.layout import bottom_button, flash
 from ui.result_step import import_trip
 from ui.state import (
@@ -63,47 +64,56 @@ def load_trip_file(data: bytes) -> str | None:
 
 
 def render_setup() -> None:
-    st.header("어떤 여행이었나요?", anchor=False)
+    st.header("여행 정보를 알려 주세요", anchor=False)
+    st.caption("질문 네 가지에 답하면 영수증을 올릴 수 있어요.")
     trip = get_trip()
     _init_from_trip(trip)
 
-    st.text_input("여행 이름", key="setup_name", placeholder="제주 2박 3일")
-    with st.container(horizontal=True):
-        st.date_input("가는 날", key="setup_start")
-        st.date_input("오는 날", key="setup_end")
+    # 질문 하나에 카드 하나(ui/layout.py의 .st-key-sec_ CSS). 무엇을 채워야 하는지 한눈에 보이게 한다.
+    with _section("sec_trip", "어디로 다녀왔나요?"):
+        st.text_input("여행 이름 (선택)", key="setup_name", placeholder="제주 2박 3일")
+        with st.container(horizontal=True):
+            st.date_input("가는 날", key="setup_start")
+            st.date_input("오는 날", key="setup_end")
+        _render_trip_length(session()["setup_start"], session()["setup_end"])
 
-    st.space("small")
-    st.subheader("누구와 갔나요?", anchor=False)
-    st.text_input(
-        "함께한 사람",
-        key="setup_members",
-        placeholder="민수, 지영, 철수",
-        help="쉼표로 나눠 적고 Enter를 눌러 주세요.",
-    )
-    names = list(dict.fromkeys(n for n in parse_members(session()["setup_members"]) if n))
-    if session().get("setup_leader") not in names:
-        # 값을 지우기만 하면 화면에는 빈 선택이나 빠진 사람이 남는다.
-        session()["setup_leader"] = names[0] if names else None
-    if names:
-        st.pills("총무", names, key="setup_leader", help="돈을 모으거나 대신 낸 사람이에요.")
-    else:
-        st.caption("이름을 적으면 여기서 총무를 고를 수 있어요.")
+    with _section("sec_people", "누구와 함께 갔나요?"):
+        st.text_input(
+            "함께한 사람",
+            key="setup_members",
+            placeholder="이름을 쉼표로 나눠 적어 주세요",
+            help="예: 민수, 지영, 철수. 다 적고 Enter를 눌러 주세요.",
+        )
+        names = list(dict.fromkeys(n for n in parse_members(session()["setup_members"]) if n))
+        if session().get("setup_leader") not in names:
+            # 값을 지우기만 하면 화면에는 빈 선택이나 빠진 사람이 남는다.
+            session()["setup_leader"] = names[0] if names else None
+        if names:
+            st.markdown(f"**{len(names)}명** " + " ".join(f":gray-badge[{n}]" for n in names))
+            st.pills("총무", names, key="setup_leader")
+            st.caption("돈을 모으거나 대신 낸 사람이에요. 보통 정산금을 받아요.")
+        else:
+            st.caption("이름을 적으면 여기서 총무를 고를 수 있어요.")
 
-    st.space("small")
-    st.segmented_control(
-        "정산 방식", list(MODE_BY_LABEL), key="setup_mode", required=True, width="stretch"
-    )
-    st.caption(MODE_HELP[MODE_BY_LABEL[session()["setup_mode"]]])
-    if session()["setup_mode"] == MODE_LABELS["fund"]:
-        st.number_input("1인 회비 (원)", min_value=0, step=10000, key="setup_fee")
+    with _section("sec_mode", "어떻게 정산할까요?"):
+        st.segmented_control(
+            "정산 방식",
+            list(MODE_BY_LABEL),
+            key="setup_mode",
+            required=True,
+            width="stretch",
+            label_visibility="collapsed",
+        )
+        st.caption(MODE_HELP[MODE_BY_LABEL[session()["setup_mode"]]])
+        if session()["setup_mode"] == MODE_LABELS["fund"]:
+            st.number_input("1인 회비 (원)", min_value=0, step=10000, key="setup_fee")
 
     leader = session().get("setup_leader")
     if leader:
         # 총무는 돈을 모으거나 대신 낸 사람이라 대부분 받는 쪽이다. 계좌를 접지 않고 바로 받는다.
-        st.space("small")
-        st.subheader(f"{leader}님 계좌", anchor=False)
-        st.caption("송금 메시지에 들어가고, 정산 화면에서 은행과 계좌번호만 따로 복사할 수 있어요.")
-        _account_inputs(leader)
+        with _section("sec_account", f"{leader}님 계좌를 알려 주세요"):
+            st.caption("송금 메시지에 들어가고, 정산 화면에서 은행과 계좌번호만 복사할 수 있어요.")
+            _account_inputs(leader)
 
     with st.expander("송금 링크·다른 사람 계좌 (선택)", icon=":material/account_balance:"):
         if not names:
@@ -121,6 +131,21 @@ def render_setup() -> None:
 
     if bottom_button("다음", key="setup_save"):
         _save(trip, names)
+
+
+def _section(key: str, title: str):
+    box = st.container(key=key)
+    box.markdown(f"#### {title}", anchors=False)
+    return box
+
+
+def _render_trip_length(start: date | None, end: date | None) -> None:
+    if not start or not end:
+        return
+    if end < start:
+        st.caption(":red[오는 날이 가는 날보다 빨라요.]")
+        return
+    st.markdown(f":green-badge[{trip_length_label(start, end)}]")
 
 
 def _account_inputs(name: str) -> None:

@@ -227,6 +227,7 @@ def test_expense_labels_plain_when_unique():
 
 def test_review_unchecking_member_updates_participants(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(18000, "A", ["A", "B", "C"], id="cafe")])
+    _open_editor(at, "cafe")
     at.pills(key="part_cafe").set_value(["A", "B"]).run()
     assert at.session_state["trip"].expenses[0].participants == ["A", "B"]
 
@@ -352,7 +353,12 @@ def test_result_errors_distinguish_same_merchant(monkeypatch):
 
 def test_result_shows_table_and_messages(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
-    assert at.dataframe and sum("10,000원" in c.value for c in at.code) == 2
+    assert sum("10,000원" in c.value for c in at.code) == 2
+    assert open_people_tab(at).dataframe
+
+
+def open_people_tab(at: AppTest) -> AppTest:
+    return at.segmented_control(key="result_view").set_value("사람별 정산").run()
 
 
 def test_result_fund_leader_shortfall_shown_separately(monkeypatch):
@@ -489,6 +495,7 @@ def test_review_many_members_do_not_use_one_column_each(monkeypatch):
     at = open_app_with_trip(
         monkeypatch, expenses=[exp(10000, "A", members, id="m")], members=members
     )
+    _open_editor(at, "m")
     # 사람 수만큼 칸을 나누면 칸이 좁아져 이름이 글자 단위로 줄바꿈된다.
     in_columns = [w for col in at.columns for w in col.children.values()]
     assert not any(str(getattr(w, "key", "")).startswith("part_") for w in in_columns)
@@ -588,12 +595,14 @@ def test_each_step_has_one_primary_button(monkeypatch):
 
 def test_result_shows_person_cards(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
+    open_people_tab(at)
     texts = " ".join(m.value for m in [*at.markdown, *at.caption])
     assert "받을 돈" in texts and "보낼 돈" in texts and "20,000원" in texts
 
 
 def test_result_person_card_says_my_share(monkeypatch):
     at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
+    open_people_tab(at)
     captions = [c.value for c in at.caption]
     assert "낸 돈 30,000원, 내 몫 10,000원" in captions
     assert not any("쓴 돈" in c for c in captions)
@@ -648,7 +657,8 @@ def open_map(monkeypatch, expenses: list[Expense], results: dict[str, GeoResult]
     fake = FakeGeocoder(results)
     monkeypatch.setattr(map_view, "geocode_trip", fake)
     monkeypatch.setattr(map_view, "kakao_api_key", lambda: key)
-    return open_app_with_trip(monkeypatch, expenses=expenses, step="정산"), fake
+    at = open_app_with_trip(monkeypatch, expenses=expenses, step="정산")
+    return at.segmented_control(key="result_view").set_value("여행 돌아보기").run(), fake
 
 
 def all_text(at: AppTest) -> str:
@@ -996,3 +1006,74 @@ def test_transfer_has_account_copy_when_receiver_has_account():
     assert [label for label, _ in transfer_copies(Transfer("A", "B", 1000), trip)] == [
         "메시지 복사"
     ]
+
+
+# --- 앱처럼: 정산 화면 탭 ---
+
+RESULT_TABS = ["보낼 돈", "사람별 정산", "여행 돌아보기"]
+
+
+def test_result_starts_on_transfers_tab(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
+    view = at.segmented_control(key="result_view")
+    assert view.options == RESULT_TABS and view.value == "보낼 돈"
+    assert at.code and not at.dataframe
+
+
+def test_result_people_tab_shows_people_not_transfers(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])], step="정산")
+    at.segmented_control(key="result_view").set_value("사람별 정산").run()
+    assert at.dataframe and not at.code
+
+
+def test_map_is_looked_up_only_after_opening_trip_tab(monkeypatch):
+    fake = FakeGeocoder({"e1": GeoResult((33.4, 126.3))})
+    monkeypatch.setattr(map_view, "geocode_trip", fake)
+    monkeypatch.setattr(map_view, "kakao_api_key", lambda: "k")
+    at = open_app_with_trip(monkeypatch, expenses=[place("e1", "흑돼지", 12)], step="정산")
+    assert fake.asked == []
+    at.segmented_control(key="result_view").set_value("여행 돌아보기").run()
+    assert fake.asked == [["e1"]]
+
+
+# --- 앱처럼: 검토 화면 접기·펼치기 ---
+
+
+def test_review_rows_start_folded(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])])
+    assert not [p for p in at.pills if str(p.key).startswith("part_")]
+
+
+def test_tapping_row_unfolds_and_tapping_again_folds(monkeypatch):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", ["A", "B", "C"])])
+    at.button(key="rv_open_e1").click().run()
+    assert at.pills(key="part_e1").value == ["A", "B", "C"]
+    assert at.text_input(key="rv_name_e1").value == "가게"
+    at.button(key="rv_open_e1").click().run()
+    assert not [p for p in at.pills if str(p.key).startswith("part_")]
+
+
+@pytest.mark.parametrize(
+    ("participants", "who"), [(["A", "B", "C"], "3명 모두"), (["A", "C"], "A, C")]
+)
+def test_folded_row_says_who_joined(monkeypatch, participants, who):
+    at = open_app_with_trip(monkeypatch, expenses=[exp(30000, "A", participants)])
+    assert any(who in c.value for c in at.caption)
+
+
+# --- 앱처럼: 설정 화면 ---
+
+
+def test_setup_shows_trip_length(monkeypatch):
+    from datetime import date as d
+
+    at = open_app(monkeypatch)
+    at.date_input(key="setup_start").set_value(d(2026, 10, 10)).run()
+    at.date_input(key="setup_end").set_value(d(2026, 10, 12)).run()
+    assert any("2박 3일" in m.value for m in [*at.markdown, *at.caption])
+
+
+def test_setup_counts_members_as_typed(monkeypatch):
+    at = open_app(monkeypatch)
+    at.text_input(key="setup_members").input("민수, 지영, 철수").run()
+    assert any("3명" in m.value for m in [*at.markdown, *at.caption])
