@@ -135,6 +135,22 @@ def test_process_uploads_reports_not_receipt(app_session):
     assert any("cat.png" in n for n in app_session["upload_notices"])
 
 
+def test_process_uploads_skips_non_image_files_with_notice(app_session):
+    process_uploads([("receipt.pdf", b"%PDF-1.4"), ("a.png", png())])
+    assert (
+        "receipt.pdf: 이미지 파일만 올릴 수 있어요 (JPG·PNG·HEIC)" in app_session["upload_notices"]
+    )
+    assert len(app_session["trip"].expenses) == 1
+    assert len(app_session["recognition_cache"]) == 1
+
+
+def test_process_uploads_only_non_images_adds_nothing(app_session):
+    process_uploads([("memo.txt", b"hello"), ("receipt.PDF", b"%PDF-1.4")])
+    notices = app_session["upload_notices"]
+    assert len(notices) == 2 and all("이미지 파일만 올릴 수 있어요" in n for n in notices)
+    assert app_session["trip"].expenses == [] and app_session["upload_added"] == 0
+
+
 def test_process_uploads_uses_cache(app_session):
     process_uploads([("a.png", png())])
     assert len(app_session["recognition_cache"]) == 1
